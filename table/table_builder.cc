@@ -18,28 +18,31 @@
 namespace leveldb {
 
 struct TableBuilder::Rep {
-  Options options;
-  Options index_block_options;
-  WritableFile* file;
-  uint64_t offset;
-  Status status;
-  BlockBuilder data_block;
-  BlockBuilder index_block;
-  std::string last_key;
-  int64_t num_entries;
+  Options options;   //data block的选项
+  Options index_block_options; //index block的选项
+  WritableFile* file;  // sstable file的类
+  uint64_t offset;  // 要写入位置在sstable中的偏移
+  Status status;  //当前状态
+  BlockBuilder data_block;  // 当前操作的data block
+  BlockBuilder index_block; // sstable的index block
+  std::string last_key;  // 当前data block最后的k-v对的key 
+  int64_t num_entries;   // 目前data block的数目
   bool closed;          // Either Finish() or Abandon() has been called.
-  FilterBlockBuilder* filter_block;
+  // Filter block是存储的过滤器信息，它会存储{key, 对应data block在sstable的偏移值}，
+  // 不一定是完全精确的，以快速定位给定key是否在data block中。
+  FilterBlockBuilder* filter_block;  //根据filter数据快速定位key是否在block中  
 
   // We do not emit the index entry for a block until we have seen the
   // first key for the next data block.  This allows us to use shorter
   // keys in the index block.  For example, consider a block boundary
   // between the keys "the quick brown fox" and "the who".  We can use
   // "the r" as the key for the index block entry since it is >= all
-  // entries in the first block and < all entries in subsequent
-  // blocks.
+  // entries in the first block and < all entries in subsequent blocks.
   //
+
   // Invariant: r->pending_index_entry is true only if data_block is empty.
   bool pending_index_entry;
+  // 要添加到index block的data block的信息
   BlockHandle pending_handle;  // Handle to add to index block
 
   std::string compressed_output;

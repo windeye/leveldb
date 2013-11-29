@@ -41,7 +41,7 @@ BlockBuilder::BlockBuilder(const Options* options)
       restarts_(),
       counter_(0),
       finished_(false) {
-  assert(options->block_restart_interval >= 1);
+  assert(options->block_restart_interval >= 1); //默认值是多少
   restarts_.push_back(0);       // First restart point is at offset 0
 }
 
@@ -62,6 +62,7 @@ size_t BlockBuilder::CurrentSizeEstimate() const {
 
 Slice BlockBuilder::Finish() {
   // Append restart array
+  // 在buffer的后面追加restart points数组和数组大小
   for (size_t i = 0; i < restarts_.size(); i++) {
     PutFixed32(&buffer_, restarts_[i]);
   }
@@ -73,23 +74,28 @@ Slice BlockBuilder::Finish() {
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
   Slice last_key_piece(last_key_);
   assert(!finished_);
+  // 如果小于counter_ < block_restart_interval,则使用prefix-compress
+  // 否则把这个key作为新的重启点
   assert(counter_ <= options_->block_restart_interval);
-  assert(buffer_.empty() // No values yet?
-         || options_->comparator->Compare(key, last_key_piece) > 0);
+  assert(buffer_.empty() // No values yet? 新增key一定要大于已经添加的key
+         || options_->comparator->Compare(key, last_key_piece) > 0); 
   size_t shared = 0;
   if (counter_ < options_->block_restart_interval) {
     // See how much sharing to do with previous string
     const size_t min_length = std::min(last_key_piece.size(), key.size());
+    // 计算key相同的部分的长度
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
       shared++;
     }
   } else {
     // Restart compression
+    // 这个key全部保存
     restarts_.push_back(buffer_.size());
     counter_ = 0;
   }
   const size_t non_shared = key.size() - shared;
 
+  // 按照固定格式生成一条k-v记录，写的太赞啦,清晰明了！
   // Add "<shared><non_shared><value_size>" to buffer_
   PutVarint32(&buffer_, shared);
   PutVarint32(&buffer_, non_shared);
