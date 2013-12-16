@@ -17,7 +17,9 @@
 namespace leveldb {
 
 class Env;
-
+// 线程安全的
+// TableCache缓存的是table对象，每个DB只有一个TableCache，它内部使用
+// LRU缓存所有的Table对象，其实际内容是{file number,TableAndFile*}
 class TableCache {
  public:
   TableCache(const std::string& dbname, const Options* options, int entries);
@@ -30,6 +32,9 @@ class TableCache {
   // the returned iterator.  The returned "*tableptr" object is owned by
   // the cache and should not be deleted, and is valid for as long as the
   // returned iterator is live.
+  // 返回指定文件的iterator（对应的文件的大小必须是file_size），如果
+  // tableptr非NULL，则*tableptr保存的是底层的Table的指针。返回的*tableptr
+  // 是属于cache的，不能被delete，生命期与返回的iterator相同。
   Iterator* NewIterator(const ReadOptions& options,
                         uint64_t file_number,
                         uint64_t file_size,
@@ -37,6 +42,7 @@ class TableCache {
 
   // If a seek to internal key "k" in specified file finds an entry,
   // call (*handle_result)(arg, found_key, found_value).
+  // 如果在指定file里找到了internal key，则调handle_result处理。
   Status Get(const ReadOptions& options,
              uint64_t file_number,
              uint64_t file_size,
@@ -45,13 +51,14 @@ class TableCache {
              void (*handle_result)(void*, const Slice&, const Slice&));
 
   // Evict any entry for the specified file number
+  // evict:驱逐，清除指定文件所有cache的entry，
   void Evict(uint64_t file_number);
 
  private:
-  Env* const env_;
-  const std::string dbname_;
+  Env* const env_; // 用于操作文件
+  const std::string dbname_; // DB名
   const Options* options_;
-  Cache* cache_;
+  Cache* cache_;  //LRU
 
   Status FindTable(uint64_t file_number, uint64_t file_size, Cache::Handle**);
 };

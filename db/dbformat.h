@@ -128,6 +128,8 @@ class InternalKeyComparator : public Comparator {
 };
 
 // Filter policy wrapper that converts from internal keys to user keys
+// Filter policy的简单的包装，以使FilterPolicy可以应用到InternalKey上，
+// 主要是做了从InternalKey到UserKey的转换，然后对user_key做fliter。
 class InternalFilterPolicy : public FilterPolicy {
  private:
   const FilterPolicy* const user_policy_;

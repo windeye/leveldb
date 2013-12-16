@@ -63,6 +63,7 @@ Status Footer::DecodeFrom(Slice* input) {
   return result;
 }
 
+// 读sstable文件时使用的全局函数
 Status ReadBlock(RandomAccessFile* file,
                  const ReadOptions& options,
                  const BlockHandle& handle,
@@ -76,19 +77,22 @@ Status ReadBlock(RandomAccessFile* file,
   size_t n = static_cast<size_t>(handle.size());
   char* buf = new char[n + kBlockTrailerSize];
   Slice contents;
+  // 根据handle的偏移和size去读指定大小的数据
   Status s = file->Read(handle.offset(), n + kBlockTrailerSize, &contents, buf);
   if (!s.ok()) {
     delete[] buf;
     return s;
   }
+  // 读取到数据大小不满足指定尺寸
   if (contents.size() != n + kBlockTrailerSize) {
     delete[] buf;
     return Status::Corruption("truncated block read");
   }
 
   // Check the crc of the type and the block contents
+  // crc的值是daba block 加 type的crc,n是data block的size
   const char* data = contents.data();    // Pointer to where Read put the data
-  if (options.verify_checksums) {
+  if (options.verify_checksums) { // 如果配置里要校验CRC值
     const uint32_t crc = crc32c::Unmask(DecodeFixed32(data + n + 1));
     const uint32_t actual = crc32c::Value(data, n + 1);
     if (actual != crc) {
@@ -104,11 +108,13 @@ Status ReadBlock(RandomAccessFile* file,
         // File implementation gave us pointer to some other data.
         // Use it directly under the assumption that it will be live
         // while the file is open.
+	// file的Read返回的Slice的data指针可能没有使用我们传入的buf，
+	// 如果有使用buf，则释放Slice的data指针就是我们的事，否则是文件管理的。
         delete[] buf;
         result->data = Slice(data, n);
-        result->heap_allocated = false;
+        result->heap_allocated = false; // 文件自己处理slice的data指针
         result->cachable = false;  // Do not double-cache
-      } else {
+      } else { // 使用了new分配的buf，标志位true,我们要在后面处理
         result->data = Slice(buf, n);
         result->heap_allocated = true;
         result->cachable = true;
@@ -118,6 +124,7 @@ Status ReadBlock(RandomAccessFile* file,
       break;
     case kSnappyCompression: {
       size_t ulength = 0;
+      // 获取未压缩的数据长度
       if (!port::Snappy_GetUncompressedLength(data, n, &ulength)) {
         delete[] buf;
         return Status::Corruption("corrupted compressed block contents");
@@ -130,7 +137,7 @@ Status ReadBlock(RandomAccessFile* file,
       }
       delete[] buf;
       result->data = Slice(ubuf, ulength);
-      result->heap_allocated = true;
+      result->heap_allocated = true; // ubuf是new出来的，后面要负责释放
       result->cachable = true;
       break;
     }

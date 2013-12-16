@@ -14,6 +14,7 @@
 // policy is provided.  Clients may use their own implementations if
 // they want something more sophisticated (like scan-resistance, a
 // custom eviction policy, variable cache sizing, etc.)
+// sophisticated：复杂的、精致的
 
 #ifndef STORAGE_LEVELDB_INCLUDE_CACHE_H_
 #define STORAGE_LEVELDB_INCLUDE_CACHE_H_
@@ -29,6 +30,7 @@ class Cache;
 // of Cache uses a least-recently-used eviction policy.
 extern Cache* NewLRUCache(size_t capacity);
 
+//  cache的接口，具体的cache算法由其子类去实现。
 class Cache {
  public:
   Cache() { }

@@ -24,7 +24,13 @@ struct FileMetaData {
 
   FileMetaData() : refs(0), allowed_seeks(1 << 30), file_size(0) { }
 };
-
+// leveldb对manifest的encode/decode是通过version_edit完成的，manifest
+// 保存了leveldb的db元信息，每一次执行compaction都好比生成db的一个新的
+// version，manifest则保存这个版本的db元信息，version_edit并不操作文件，
+// 只是为manifest文件读写准备好数据以及从读取的数据解析出db元信息。
+// version_edit的作用：当版本间有增量变动时，VersionEdit记录了这种变动；
+// 写入到MANIFEST时，先将current version的db元信息保存到一个VersionEdit
+// 中，然后再组织成一个log record写入文件；
 class VersionEdit {
  public:
   VersionEdit() { Clear(); }
@@ -59,6 +65,8 @@ class VersionEdit {
   // Add the specified file at the specified number.
   // REQUIRES: This version has not been saved (see VersionSet::SaveTo)
   // REQUIRES: "smallest" and "largest" are smallest and largest keys in file
+  // 添加sstable文件信息，要求：DB元信息还没有写入磁盘Manifest文件.
+  // smallest和largest是这个文件里最大和最小的key。
   void AddFile(int level, uint64_t file,
                uint64_t file_size,
                const InternalKey& smallest,
@@ -86,17 +94,18 @@ class VersionEdit {
 
   typedef std::set< std::pair<int, uint64_t> > DeletedFileSet;
 
-  std::string comparator_;
-  uint64_t log_number_;
-  uint64_t prev_log_number_;
-  uint64_t next_file_number_;
-  SequenceNumber last_sequence_;
+  std::string comparator_; // key comparator名字
+  uint64_t log_number_; // 日志编号  
+  uint64_t prev_log_number_; // 上一个日志编号
+  uint64_t next_file_number_; // 下一个文件编号
+  SequenceNumber last_sequence_; // 上一个seq,是最后一个seq num吗？
   bool has_comparator_;
   bool has_log_number_;
   bool has_prev_log_number_;
   bool has_next_file_number_;
   bool has_last_sequence_;
 
+  // 压缩点
   std::vector< std::pair<int, InternalKey> > compact_pointers_;
   DeletedFileSet deleted_files_;
   std::vector< std::pair<int, FileMetaData> > new_files_;

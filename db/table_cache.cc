@@ -16,13 +16,14 @@ struct TableAndFile {
   Table* table;
 };
 
+// 为LRUCache注册的delete函数
 static void DeleteEntry(const Slice& key, void* value) {
   TableAndFile* tf = reinterpret_cast<TableAndFile*>(value);
   delete tf->table;
   delete tf->file;
   delete tf;
 }
-
+// 为iterator注册的Unref函数
 static void UnrefEntry(void* arg1, void* arg2) {
   Cache* cache = reinterpret_cast<Cache*>(arg1);
   Cache::Handle* h = reinterpret_cast<Cache::Handle*>(arg2);
@@ -48,19 +49,25 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
   char buf[sizeof(file_number)];
   EncodeFixed64(buf, file_number);
   Slice key(buf, sizeof(buf));
+  // 先在cache中找这个file number对应的table。
   *handle = cache_->Lookup(key);
+  // *handle为NULL，说明在cache中没有找到这个table。
   if (*handle == NULL) {
+    // 根据db名和file number生成sst文件名，格式：db_name.filenumber(%6u).sst
     std::string fname = TableFileName(dbname_, file_number);
     RandomAccessFile* file = NULL;
     Table* table = NULL;
+    // 打开文件。
     s = env_->NewRandomAccessFile(fname, &file);
     if (!s.ok()) {
+      // 命名格式有变动啊。
       std::string old_fname = SSTTableFileName(dbname_, file_number);
       if (env_->NewRandomAccessFile(old_fname, &file).ok()) {
         s = Status::OK();
       }
     }
     if (s.ok()) {
+      // 打开文件成功，读取文件生成table对象
       s = Table::Open(*options_, file, file_size, &table);
     }
 
@@ -73,6 +80,7 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
       TableAndFile* tf = new TableAndFile;
       tf->file = file;
       tf->table = table;
+      // 将其放进table的cache中。
       *handle = cache_->Insert(key, tf, 1, &DeleteEntry);
     }
   }
@@ -88,11 +96,13 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
   }
 
   Cache::Handle* handle = NULL;
+  // 调用FindTable，返回cache对象.
   Status s = FindTable(file_number, file_size, &handle);
   if (!s.ok()) {
     return NewErrorIterator(s);
   }
 
+  // 为table生成iterator，是two level iterator吧？
   Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
   Iterator* result = table->NewIterator(options);
   result->RegisterCleanup(&UnrefEntry, cache_, handle);
@@ -109,10 +119,13 @@ Status TableCache::Get(const ReadOptions& options,
                        void* arg,
                        void (*saver)(void*, const Slice&, const Slice&)) {
   Cache::Handle* handle = NULL;
+  // 先根据file_number找到Table的Cache对象
   Status s = FindTable(file_number, file_size, &handle);
   if (s.ok()) {
     Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
+    // 如果找到了就调InternalGet，对查找结果的处理在saver中处理。
     s = t->InternalGet(options, k, arg, saver);
+    // Release减少引用计数
     cache_->Release(handle);
   }
   return s;

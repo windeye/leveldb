@@ -20,7 +20,7 @@ class TwoLevelIterator: public Iterator {
   TwoLevelIterator(
     Iterator* index_iter,
     BlockFunction block_function,
-    void* arg,
+    void* arg,    
     const ReadOptions& options);
 
   virtual ~TwoLevelIterator();
@@ -44,6 +44,7 @@ class TwoLevelIterator: public Iterator {
   }
   virtual Status status() const {
     // It'd be nice if status() returned a const Status& instead of a Status
+    // 返回const reference更好
     if (!index_iter_.status().ok()) {
       return index_iter_.status();
     } else if (data_iter_.iter() != NULL && !data_iter_.status().ok()) {
@@ -55,6 +56,8 @@ class TwoLevelIterator: public Iterator {
 
  private:
   void SaveError(const Status& s) {
+    // status_不是ok的时候，就不保存这个错误了吗？
+    // 可能s与status_的错误不一样啊，这没有问题吗？
     if (status_.ok() && !s.ok()) status_ = s;
   }
   void SkipEmptyDataBlocksForward();
@@ -62,14 +65,16 @@ class TwoLevelIterator: public Iterator {
   void SetDataIterator(Iterator* data_iter);
   void InitDataBlock();
 
-  BlockFunction block_function_;
-  void* arg_;
-  const ReadOptions options_;
+  BlockFunction block_function_; // 解析data block's k-v函数
+  void* arg_;  // block_function的自定义参数
+  const ReadOptions options_;  // block_function的读配置
   Status status_;
-  IteratorWrapper index_iter_;
-  IteratorWrapper data_iter_; // May be NULL
+  IteratorWrapper index_iter_; // 遍历blocks的iterator
+  IteratorWrapper data_iter_; // May be NULL，遍历data block的iterator
   // If data_iter_ is non-NULL, then "data_block_handle_" holds the
   // "index_value" passed to block_function_ to create the data_iter_.
+  // 如果data_iter_非NULL，则data_block_handle_保存传给block function
+  // 的index_value,用来创建data_iter_,也就是解析k-v时会用到这个值吧？
   std::string data_block_handle_;
 };
 
@@ -91,7 +96,10 @@ TwoLevelIterator::~TwoLevelIterator() {
 void TwoLevelIterator::Seek(const Slice& target) {
   index_iter_.Seek(target);
   InitDataBlock();
+  // 调整data_iter_到target
   if (data_iter_.iter() != NULL) data_iter_.Seek(target);
+  // 如果data_iter_有效，SkipForward就会直接返回了，只有在
+  // data_iter_无效时，SkipForward才会定位到下一个有效data block。 
   SkipEmptyDataBlocksForward();
 }
 
@@ -121,10 +129,12 @@ void TwoLevelIterator::Prev() {
   SkipEmptyDataBlocksBackward();
 }
 
-
+// 向前跳过空的block
 void TwoLevelIterator::SkipEmptyDataBlocksForward() {
   while (data_iter_.iter() == NULL || !data_iter_.Valid()) {
     // Move to next block
+    // index_iter_无效，就无法读data block，也就无法迭代data block
+    // so data_iter_置为空，return 空.
     if (!index_iter_.Valid()) {
       SetDataIterator(NULL);
       return;
@@ -135,6 +145,7 @@ void TwoLevelIterator::SkipEmptyDataBlocksForward() {
   }
 }
 
+// 向后跳过空的block
 void TwoLevelIterator::SkipEmptyDataBlocksBackward() {
   while (data_iter_.iter() == NULL || !data_iter_.Valid()) {
     // Move to next block
@@ -162,6 +173,8 @@ void TwoLevelIterator::InitDataBlock() {
       // data_iter_ is already constructed with this iterator, so
       // no need to change anything
     } else {
+      // 根据当前index_iter_的值定位下一个data block,并初用
+      // block_function生成一个新的iterator。
       Iterator* iter = (*block_function_)(arg_, options_, handle);
       data_block_handle_.assign(handle.data(), handle.size());
       SetDataIterator(iter);

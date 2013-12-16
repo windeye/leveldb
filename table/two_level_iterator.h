@@ -20,6 +20,13 @@ struct ReadOptions;
 //
 // Uses a supplied function to convert an index_iter value into
 // an iterator over the contents of the corresponding block.
+// 专门为sstable定制的iterator，two-level iterator是sstable一系列block的
+// index iterator，block是一系列的k-v对。就是专为data block使用的吧！
+// 返回的two-level iterator会串联一系列blocks的所有k-v对。index_iter
+// 不再使用时要删除。
+//
+// block_function的作用；在遍历不同的data block时去解析block里的k-v对，
+// 它返回一个针对data block的iterator。
 extern Iterator* NewTwoLevelIterator(
     Iterator* index_iter,
     Iterator* (*block_function)(

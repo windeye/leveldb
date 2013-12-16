@@ -22,21 +22,23 @@ namespace {
 
 // An entry is a variable length heap-allocated structure.  Entries
 // are kept in a circular doubly linked list ordered by access time.
+// LRU的底层实现，环形双向链表，按时间排序。LRUHandle是链表的节点。
 struct LRUHandle {
-  void* value;
-  void (*deleter)(const Slice&, void* value);
-  LRUHandle* next_hash;
+  void* value; // cache的内容
+  void (*deleter)(const Slice&, void* value);  // 回收本cache节点的资源
+  LRUHandle* next_hash; // 用于hash table中bucket的单向链表
   LRUHandle* next;
   LRUHandle* prev;
   size_t charge;      // TODO(opt): Only allow uint32_t?
   size_t key_length;
-  uint32_t refs;
+  uint32_t refs;  // 本cache的引用计数
   uint32_t hash;      // Hash of key(); used for fast sharding and comparisons
-  char key_data[1];   // Beginning of key
+  char key_data[1];   // Beginning of key，key的地址,挺巧妙啊。
 
   Slice key() const {
     // For cheaper lookups, we allow a temporary Handle object
     // to store a pointer to a key in "value".
+    // 把key的指针放在value里，value和key一样，而且next = this，这是啥情况？
     if (next == this) {
       return *(reinterpret_cast<Slice*>(value));
     } else {
@@ -50,8 +52,10 @@ struct LRUHandle {
 // table implementations in some of the compiler/runtime combinations
 // we have tested.  E.g., readrandom speeds up by ~5% over the g++
 // 4.4.3's builtin hashtable.
+// 实现一个简单的hashtable，没有那些跨平台的hacks，所以效率比一些hashtable更快。
 class HandleTable {
  public:
+  // Resize干了很多事。
   HandleTable() : length_(0), elems_(0), list_(NULL) { Resize(); }
   ~HandleTable() { delete[] list_; }
 
@@ -60,6 +64,7 @@ class HandleTable {
   }
 
   LRUHandle* Insert(LRUHandle* h) {
+    // 已存在就替换，没有则在尾部新添加。
     LRUHandle** ptr = FindPointer(h->key(), h->hash);
     LRUHandle* old = *ptr;
     h->next_hash = (old == NULL ? NULL : old->next_hash);
@@ -88,6 +93,7 @@ class HandleTable {
  private:
   // The table consists of an array of buckets where each bucket is
   // a linked list of cache entries that hash into the bucket.
+  // hash table的bucket里是LRUHandle链表,貌似是单向的，为啥不复用next?
   uint32_t length_;
   uint32_t elems_;
   LRUHandle** list_;
@@ -96,7 +102,10 @@ class HandleTable {
   // matches key/hash.  If there is no such cache entry, return a
   // pointer to the trailing slot in the corresponding linked list.
   LRUHandle** FindPointer(const Slice& key, uint32_t hash) {
+    // 用&运算更快点，每个细节都做的这么好,定位在哪个bucket里
     LRUHandle** ptr = &list_[hash & (length_ - 1)];
+    // 遍历链表，找到hash和key都与传入参数相同的节点，返回此节点。
+    // 如果找不到这个key，则返回链表的最后一个节点，其实是NULL。
     while (*ptr != NULL &&
            ((*ptr)->hash != hash || key != (*ptr)->key())) {
       ptr = &(*ptr)->next_hash;
@@ -109,6 +118,7 @@ class HandleTable {
     while (new_length < elems_) {
       new_length *= 2;
     }
+    // 直接按照元素的数量扩充bucket的大小。
     LRUHandle** new_list = new LRUHandle*[new_length];
     memset(new_list, 0, sizeof(new_list[0]) * new_length);
     uint32_t count = 0;
@@ -160,7 +170,7 @@ class LRUCache {
   port::Mutex mutex_;
   size_t usage_;
 
-  // Dummy head of LRU list.
+  // Dummy head of LRU list. dummy:虚拟的，假的
   // lru.prev is newest entry, lru.next is oldest entry.
   LRUHandle lru_;
 
@@ -225,6 +235,7 @@ void LRUCache::Release(Cache::Handle* handle) {
 Cache::Handle* LRUCache::Insert(
     const Slice& key, uint32_t hash, void* value, size_t charge,
     void (*deleter)(const Slice& key, void* value)) {
+  // 线程安全了吧
   MutexLock l(&mutex_);
 
   LRUHandle* e = reinterpret_cast<LRUHandle*>(
