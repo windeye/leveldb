@@ -87,6 +87,7 @@ typedef void (*LinuxKernelMemoryBarrierFunc)(void);
 // than 180ns on a Cortex-A8 like the one on a Nexus One). Benchmarking
 // shows that the extra function call cost is completely negligible on
 // multi-core devices.
+// negligible:可忽略的
 //
 inline void MemoryBarrier() {
   (*(LinuxKernelMemoryBarrierFunc)0xffff0fa0)();

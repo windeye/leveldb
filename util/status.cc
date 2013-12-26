@@ -20,6 +20,7 @@ Status::Status(Code code, const Slice& msg, const Slice& msg2) {
   assert(code != kOk);
   const uint32_t len1 = msg.size();
   const uint32_t len2 = msg2.size();
+  // 如果msg2的长度大于0，则将msg2放在msg后面，用": "分割
   const uint32_t size = len1 + (len2 ? (2 + len2) : 0);
   char* result = new char[size + 5];
   memcpy(result, &size, sizeof(size));
@@ -67,6 +68,7 @@ std::string Status::ToString() const {
     std::string result(type);
     uint32_t length;
     memcpy(&length, state_, sizeof(length));
+    // 将原来state里的msg也追加到result中返回。
     result.append(state_ + 5, length);
     return result;
   }

@@ -1257,14 +1257,17 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
     // during this phase since &w is currently responsible for logging
     // and protects against concurrent loggers and concurrent writes
     // into mem_.
-    // 追加log同时写入memtable，此阶段可以释放掉锁，因为&w
+    // 追加log同时写入memtable，此阶段可以释放掉锁，因为&w现在负责写log，
+    // 此时w可以避免并发的写logger和并发写mem_
     {
       mutex_.Unlock();
+      // 把updates的内容写入log
       status = log_->AddRecord(WriteBatchInternal::Contents(updates));
       if (status.ok() && options.sync) {
-        status = logfile_->Sync();
+        status = logfile_->Sync();  //同步
       }
       if (status.ok()) {
+        // 放到memtable中
         status = WriteBatchInternal::InsertInto(updates, mem_);
       }
       mutex_.Lock();
