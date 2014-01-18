@@ -52,10 +52,13 @@ int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   //    increasing user key (according to user-supplied comparator)
   //    decreasing sequence number
   //    decreasing type (though sequence# should be enough to disambiguate)
+
+  //  比较user key
   int r = user_comparator_->Compare(ExtractUserKey(akey), ExtractUserKey(bkey));
   if (r == 0) {
     const uint64_t anum = DecodeFixed64(akey.data() + akey.size() - 8);
     const uint64_t bnum = DecodeFixed64(bkey.data() + bkey.size() - 8);
+    // sequence number降序比较，越大的越晚
     if (anum > bnum) {
       r = -1;
     } else if (anum < bnum) {
@@ -77,6 +80,9 @@ void InternalKeyComparator::FindShortestSeparator(
       user_comparator_->Compare(user_start, tmp) < 0) {
     // User key has become shorter physically, but larger logically.
     // Tack on the earliest possible number to the shortened user key.
+    // user key的长度变短了，但是key的逻辑值是变大了的。
+    // 给这个user key使用最大的sequence number，保证在相同的user key里
+    // 这个user key排在最前面
     PutFixed64(&tmp, PackSequenceAndType(kMaxSequenceNumber,kValueTypeForSeek));
     assert(this->Compare(*start, tmp) < 0);
     assert(this->Compare(tmp, limit) < 0);

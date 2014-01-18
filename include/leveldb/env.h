@@ -6,9 +6,12 @@
 // operating system functionality like the filesystem etc.  Callers
 // may wish to provide a custom Env object when opening a database to
 // get fine gain control; e.g., to rate limit file system operations.
+// Env为leveldb提供了一个访问操作系统功能的接口，比如文件系统等等。调用者
+// 可以在打开数据库是使用自定义的Env对象以获得更好的效果。
 //
 // All Env implementations are safe for concurrent access from
 // multiple threads without any external synchronization.
+// Env是线程安全的。
 
 #ifndef STORAGE_LEVELDB_INCLUDE_ENV_H_
 #define STORAGE_LEVELDB_INCLUDE_ENV_H_
@@ -36,6 +39,8 @@ class Env {
   // Return a default environment suitable for the current operating
   // system.  Sophisticated users may wish to provide their own Env
   // implementation instead of relying on this default environment.
+  // 返回一个适用于当前操作系统的默认环境变量。Default()的返回值属于
+  // leveldb，never delete it。
   //
   // The result of Default() belongs to leveldb and must never be deleted.
   static Env* Default();
@@ -44,8 +49,12 @@ class Env {
   // On success, stores a pointer to the new file in *result and returns OK.
   // On failure stores NULL in *result and returns non-OK.  If the file does
   // not exist, returns a non-OK status.
+  // 使用指定文件名创建一个新的顺序读的文件，创建成功后，将文件的指针保存到
+  // result并返回OK。创建失败则返回non-OK，并在result中保存NULL。如果文件
+  // 不存在，则返回non-OK。
   //
   // The returned file will only be accessed by one thread at a time.
+  // 返回的文件在同一时刻只能允许一个线程访问。
   virtual Status NewSequentialFile(const std::string& fname,
                                    SequentialFile** result) = 0;
 
@@ -56,6 +65,7 @@ class Env {
   // status.
   //
   // The returned file may be concurrently accessed by multiple threads.
+  // 可以多个线程同时访问。
   virtual Status NewRandomAccessFile(const std::string& fname,
                                      RandomAccessFile** result) = 0;
 
@@ -64,6 +74,7 @@ class Env {
   // new file.  On success, stores a pointer to the new file in
   // *result and returns OK.  On failure stores NULL in *result and
   // returns non-OK.
+  // 创建一个可写文件的对象，如果文件存在就删除它建立一个新的文件。
   //
   // The returned file will only be accessed by one thread at a time.
   virtual Status NewWritableFile(const std::string& fname,
@@ -75,6 +86,7 @@ class Env {
   // Store in *result the names of the children of the specified directory.
   // The names are relative to "dir".
   // Original contents of *results are dropped.
+  // 保存指定文件夹的相关内容到result，result之前的内容被丢弃。
   virtual Status GetChildren(const std::string& dir,
                              std::vector<std::string>* result) = 0;
 
@@ -97,11 +109,15 @@ class Env {
   // Lock the specified file.  Used to prevent concurrent access to
   // the same db by multiple processes.  On failure, stores NULL in
   // *lock and returns non-OK.
+  // 锁定指定文件，防止多个线程并发的访问同一个DB，如果失败则保存NULL
+  // 到*lock，同时返回non-OK。
   //
   // On success, stores a pointer to the object that represents the
   // acquired lock in *lock and returns OK.  The caller should call
   // UnlockFile(*lock) to release the lock.  If the process exits,
   // the lock will be automatically released.
+  // 如果成功,保存一个lock对象指针到*lock并返回OK。调用者要调用Unlock
+  // 释放这个锁，如果线程退出，锁会被自动释放。
   //
   // If somebody else already holds the lock, finishes immediately
   // with a failure.  I.e., this call does not wait for existing locks
@@ -209,6 +225,7 @@ class RandomAccessFile {
 // A file abstraction for sequential writing.  The implementation
 // must provide buffering since callers may append small fragments
 // at a time to the file.
+// 实现这个接口的类必须实现buffer机制
 class WritableFile {
  public:
   WritableFile() { }

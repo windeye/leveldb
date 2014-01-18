@@ -55,7 +55,9 @@ bool Reader::SkipToInitialBlock() {
 
   return true;
 }
-
+// 读取一条逻辑record，如果record的长度大于kBlockSize，则将结果保存
+// 在stratch，否则保存在buffer_以节省内存,但调用的时候要注意
+// scratch可能为空。
 bool Reader::ReadRecord(Slice* record, std::string* scratch) {
   if (last_record_offset_ < initial_offset_) {
     if (!SkipToInitialBlock()) {
@@ -76,7 +78,7 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
     const unsigned int record_type = ReadPhysicalRecord(&fragment);
     switch (record_type) {
       case kFullType:
-        if (in_fragmented_record) {
+        if (in_fragmented_record) { // 标示一个逻辑Record是否被分片存储
           // Handle bug in earlier versions of log::Writer where
           // it could emit an empty kFirstType record at the tail end
           // of a block followed by a kFullType or kFirstType record
@@ -178,7 +180,7 @@ void Reader::ReportDrop(size_t bytes, const Status& reason) {
 
 unsigned int Reader::ReadPhysicalRecord(Slice* result) {
   while (true) {
-    if (buffer_.size() < kHeaderSize) {
+    if (buffer_.size() < kHeaderSize) { // header size is 7 bytes
       if (!eof_) {
         // Last read was a full read, so this is a trailer to skip
         buffer_.clear();

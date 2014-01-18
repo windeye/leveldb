@@ -45,6 +45,7 @@ class PosixSequentialFile: public SequentialFile {
       : filename_(fname), file_(f) { }
   virtual ~PosixSequentialFile() { fclose(file_); }
 
+  // 需要提供外部同步，线程不安全
   virtual Status Read(size_t n, Slice* result, char* scratch) {
     Status s;
     size_t r = fread_unlocked(scratch, 1, n, file_);
@@ -95,6 +96,8 @@ class PosixRandomAccessFile: public RandomAccessFile {
 // Helper class to limit mmap file usage so that we do not end up
 // running out virtual memory or running into kernel performance
 // problems for very large databases.
+// 辅助类，现在mmap的使用，防止因为VM用尽导致系统问题，或者因为过大
+// 的数据集导致内核性能问题。
 class MmapLimiter {
  public:
   // Up to 1000 mmaps for 64-bit binaries; none for smaller pointer sizes.
@@ -108,6 +111,7 @@ class MmapLimiter {
     if (GetAllowed() <= 0) {
       return false;
     }
+    // 有atomic啦，为啥还要用mutex。
     MutexLock l(&mu_);
     intptr_t x = GetAllowed();
     if (x <= 0) {
@@ -396,13 +400,14 @@ class PosixFileLock : public FileLock {
 // Set of locked files.  We keep a separate set instead of just
 // relying on fcntrl(F_SETLK) since fcntl(F_SETLK) does not provide
 // any protection against multiple uses from the same process.
+// F_SETLK无法保护统一进程对同一文件的并发操作
 class PosixLockTable {
  private:
   port::Mutex mu_;
   std::set<std::string> locked_files_;
  public:
   bool Insert(const std::string& fname) {
-    MutexLock l(&mu_);
+    MutexLock l(&mu_); //构造时执行lock，析构时unlock。
     return locked_files_.insert(fname).second;
   }
   void Remove(const std::string& fname) {

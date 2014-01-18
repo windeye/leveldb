@@ -96,7 +96,7 @@ class HandleTable {
   // hash table的bucket里是LRUHandle链表,貌似是单向的，为啥不复用next?
   uint32_t length_;
   uint32_t elems_;
-  LRUHandle** list_;
+  LRUHandle** list_; // LRUHandle的bucket
 
   // Return a pointer to slot that points to a cache entry that
   // matches key/hash.  If there is no such cache entry, return a
@@ -124,6 +124,7 @@ class HandleTable {
     uint32_t count = 0;
     for (uint32_t i = 0; i < length_; i++) {
       LRUHandle* h = list_[i];
+      // 当前bucket的数据重新分布一下
       while (h != NULL) {
         LRUHandle* next = h->next_hash;
         uint32_t hash = h->hash;
@@ -135,6 +136,7 @@ class HandleTable {
       }
     }
     assert(elems_ == count);
+    // 在构造函数中调用Resize的时候，list_为空也可以？
     delete[] list_;
     list_ = new_list;
     length_ = new_length;
@@ -221,6 +223,7 @@ Cache::Handle* LRUCache::Lookup(const Slice& key, uint32_t hash) {
   LRUHandle* e = table_.Lookup(key, hash);
   if (e != NULL) {
     e->refs++;
+    // 使e成为newest entry
     LRU_Remove(e);
     LRU_Append(e);
   }
@@ -280,7 +283,8 @@ static const int kNumShards = 1 << kNumShardBits;
 
 class ShardedLRUCache : public Cache {
  private:
-  LRUCache shard_[kNumShards];
+  LRUCache shard_[kNumShards]; //sixteen
+  // protect last_id_
   port::Mutex id_mutex_;
   uint64_t last_id_;
 
@@ -289,12 +293,14 @@ class ShardedLRUCache : public Cache {
   }
 
   static uint32_t Shard(uint32_t hash) {
+    // 只使用高4位，肯定是0-15内的值
     return hash >> (32 - kNumShardBits);
   }
 
  public:
   explicit ShardedLRUCache(size_t capacity)
       : last_id_(0) {
+    // capacity是16个cache的总大小，默认的8M在分配到16个数组后其实也不大
     const size_t per_shard = (capacity + (kNumShards - 1)) / kNumShards;
     for (int s = 0; s < kNumShards; s++) {
       shard_[s].SetCapacity(per_shard);

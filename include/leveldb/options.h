@@ -74,8 +74,8 @@ struct Options {
   // be written to info_log if it is non-NULL, or to a file stored
   // in the same directory as the DB contents if info_log is NULL.
   // Default: NULL
-  // 如果不为NULL，则用来记录一些处理的信息和错误，如果为NULL，就用
-  // 就记录到和DB内容相同的文件夹里的文件。
+  // 如果不为NULL，则用来记录一些处理的信息和错误，如果为NULL，就
+  // 记录到和DB内容相同的文件夹里的文件。
   Logger* info_log;
 
   // -------------------

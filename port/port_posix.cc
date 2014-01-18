@@ -35,6 +35,7 @@ CondVar::CondVar(Mutex* mu)
 CondVar::~CondVar() { PthreadCall("destroy cv", pthread_cond_destroy(&cv_)); }
 
 void CondVar::Wait() {
+  // friend of Mutex, so mu_->mu_ is ok.
   PthreadCall("wait", pthread_cond_wait(&cv_, &mu_->mu_));
 }
 

@@ -878,14 +878,14 @@ VersionSet::VersionSet(const std::string& dbname,
       options_(options),
       table_cache_(table_cache),
       icmp_(*cmp),
-      next_file_number_(2),
+      next_file_number_(2), //为啥是2呢
       manifest_file_number_(0),  // Filled by Recover()
       last_sequence_(0),
       log_number_(0),
       prev_log_number_(0),
       descriptor_file_(NULL),
       descriptor_log_(NULL),
-      dummy_versions_(this),
+      dummy_versions_(this),  // friend of DBImpl
       current_(NULL) {
   AppendVersion(new Version(this));
 }

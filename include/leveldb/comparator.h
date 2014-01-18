@@ -15,6 +15,7 @@ class Slice;
 // used as keys in an sstable or a database.  A Comparator implementation
 // must be thread-safe since leveldb may invoke its methods concurrently
 // from multiple threads.
+// 必须线程安全
 class Comparator {
  public:
   virtual ~Comparator();
@@ -39,10 +40,13 @@ class Comparator {
 
   // Advanced functions: these are used to reduce the space requirements
   // for internal data structures like index blocks.
+  // 高级函数，用于减少内部数据结构的空间需求，比如index blocks。
 
   // If *start < limit, changes *start to a short string in [start,limit).
   // Simple comparator implementations may return with *start unchanged,
   // i.e., an implementation of this method that does nothing is correct.
+  // 如果 *start < limit， 把*start变为[start,limit)内的一个短字符串。
+  // 简单的comparator可以不改变*start。
   virtual void FindShortestSeparator(
       std::string* start,
       const Slice& limit) const = 0;
@@ -50,6 +54,7 @@ class Comparator {
   // Changes *key to a short string >= *key.
   // Simple comparator implementations may return with *key unchanged,
   // i.e., an implementation of this method that does nothing is correct.
+  // 把*key变为一个 >=*key的短字符串。
   virtual void FindShortSuccessor(std::string* key) const = 0;
 };
 

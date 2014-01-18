@@ -55,6 +55,7 @@ struct DBImpl::CompactionState {
   // will never have to service a snapshot below smallest_snapshot.
   // Therefore if we have seen a sequence number S <= smallest_snapshot,
   // we can drop all entries for the same key with sequence numbers < S.
+  // sequence numbers 小于 smallest_snapshot的key是无意义的。
   SequenceNumber smallest_snapshot;
 
   // Files produced by compaction
@@ -71,6 +72,7 @@ struct DBImpl::CompactionState {
 
   uint64_t total_bytes;
 
+  // 返回最后一个output
   Output* current_output() { return &outputs[outputs.size()-1]; }
 
   explicit CompactionState(Compaction* c)
@@ -94,11 +96,15 @@ Options SanitizeOptions(const std::string& dbname,
   Options result = src;
   result.comparator = icmp;
   result.filter_policy = (src.filter_policy != NULL) ? ipolicy : NULL;
+  // table cache 大小，缓存的sst文件索引的数量
   ClipToRange(&result.max_open_files,    64 + kNumNonTableCacheFiles, 50000);
+  // write buffer 最小64KB，最大1G, memtable的大小
   ClipToRange(&result.write_buffer_size, 64<<10,                      1<<30);
+  // block 最小1kB，最大4MB
   ClipToRange(&result.block_size,        1<<10,                       4<<20);
   if (result.info_log == NULL) {
     // Open a log file in the same directory as the db
+    // 一定会有一个info log file，记录处理过程中的错误
     src.env->CreateDir(dbname);  // In case it does not exist
     src.env->RenameFile(InfoLogFileName(dbname), OldInfoLogFileName(dbname));
     Status s = src.env->NewLogger(InfoLogFileName(dbname), &result.info_log);
@@ -108,6 +114,7 @@ Options SanitizeOptions(const std::string& dbname,
     }
   }
   if (result.block_cache == NULL) {
+    // 也一定会有一个LRU cache, 8M.
     result.block_cache = NewLRUCache(8 << 20);
   }
   return result;
@@ -139,7 +146,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   has_imm_.Release_Store(NULL);
 
   // Reserve ten files or so for other uses and give the rest to TableCache.
-  // 预留10个文件，剩下的都给table cache使用。
+  // 预留10个文件用于其它用途，剩下的都给table cache使用。
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
   table_cache_ = new TableCache(dbname_, &options_, table_cache_size);
   // 创建version set
@@ -280,7 +287,7 @@ void DBImpl::DeleteObsoleteFiles() {
 }
 
 Status DBImpl::Recover(VersionEdit* edit) {
-  mutex_.AssertHeld();
+  mutex_.AssertHeld();  // 一个空函数
 
   // Ignore error from CreateDir since the creation of the DB is
   // committed only when the descriptor is created, and this directory
