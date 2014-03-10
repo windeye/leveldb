@@ -53,6 +53,7 @@ class Slice {
   }
 
   // Change this slice to refer to an empty array
+  // data的空间不释放吗？如何释放？不知道data是怎么分配的
   void clear() { data_ = ""; size_ = 0; }
 
   // Drop the first "n" bytes from this slice.
