@@ -44,6 +44,7 @@ struct TableBuilder::Rep {
   // 做前一个block的索引key就可满足index block的条件。
 
   // Invariant: r->pending_index_entry is true only if data_block is empty.
+  // 只有当data block为空时，pending index entry为空。
   bool pending_index_entry;
   // 要添加到index block的data block的信息,data block的偏移和size。
   BlockHandle pending_handle;  // Handle to add to index block
@@ -63,7 +64,7 @@ struct TableBuilder::Rep {
         filter_block(opt.filter_policy == NULL ? NULL
                      : new FilterBlockBuilder(opt.filter_policy)),
         pending_index_entry(false) {
-    index_block_options.block_restart_interval = 1;
+    index_block_options.block_restart_interval = 1; // 不使用restart points。
   }
 };
 

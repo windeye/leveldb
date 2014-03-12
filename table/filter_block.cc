@@ -12,6 +12,7 @@ namespace leveldb {
 // See doc/table_format.txt for an explanation of the filter block format.
 
 // Generate new filter every 2KB of data
+// 每2KB的data block生成一个filter block。
 static const size_t kFilterBaseLg = 11;
 static const size_t kFilterBase = 1 << kFilterBaseLg;
 
@@ -54,6 +55,7 @@ Slice FilterBlockBuilder::Finish() {
   }
   // filter的数量
   PutFixed32(&result_, array_offset);
+  // 这个不用fixed32啊,这里把kFilterBaseLg转为char了，所以是一字节。a trick?
   result_.push_back(kFilterBaseLg);  // Save encoding parameter in result
   return Slice(result_);
 }
@@ -78,7 +80,7 @@ void FilterBlockBuilder::GenerateFilter() {
   }
 
   // Generate filter for current set of keys and append to result_.
-  // 为当前的key集合生成filter，吧结果append到result_后面。
+  // 为当前的key集合生成filter，把结果append到result_后面。
   filter_offsets_.push_back(result_.size());
   policy_->CreateFilter(&tmp_keys_[0], num_keys, &result_);
 

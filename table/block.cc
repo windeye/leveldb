@@ -53,6 +53,7 @@ Block::~Block() {
 // storing the number of shared key bytes, non_shared key bytes,
 // and the length of the value in "*shared", "*non_shared", and
 // "*value_length", respectively.  Will not derefence past "limit".
+// 解析下一个存储在地址p的k-v，主要是三个长度
 //
 // If any errors are detected, returns NULL.  Otherwise, returns a
 // pointer to the key delta (just past the three decoded values).
@@ -232,6 +233,7 @@ class Block::Iter : public Iterator {
   bool ParseNextKey() {
     current_ = NextEntryOffset();
     const char* p = data_ + current_;
+    // limit是最大边界，即重启点的起始位置。
     const char* limit = data_ + restarts_;  // Restarts come right after data
     if (p >= limit) {
       // No more entries to return.  Mark as invalid.
@@ -242,6 +244,7 @@ class Block::Iter : public Iterator {
 
     // Decode next entry
     uint32_t shared, non_shared, value_length;
+    //decode成功后，p指向nonshared key的位置。
     p = DecodeEntry(p, limit, &shared, &non_shared, &value_length);
     if (p == NULL || key_.size() < shared) {
       CorruptionError();
@@ -250,6 +253,8 @@ class Block::Iter : public Iterator {
       key_.resize(shared);
       key_.append(p, non_shared);
       value_ = Slice(p + non_shared, value_length);
+      // 如果重启点间隔是2，则重启点的位置是0,2,4...，更新restart_index_会在
+      // 第3,5...个entry处发生，也就是重启点的下一个k-v
       while (restart_index_ + 1 < num_restarts_ &&
              GetRestartPoint(restart_index_ + 1) < current_) {
         ++restart_index_;

@@ -22,7 +22,7 @@ class TableCache;
 // immutable and persistent.  A Table may be safely accessed from
 // multiple threads without external synchronization.
 class Table {
- public: // 仅3个public的API
+ public: // 仅3个public的API,主要是用于遍历table的。
   // Attempt to open the table that is stored in bytes [0..file_size)
   // of "file", and read the metadata entries necessary to allow
   // retrieving data from the table.
