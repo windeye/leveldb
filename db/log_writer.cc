@@ -31,11 +31,16 @@ Status Writer::AddRecord(const Slice& slice) {
   // Fragment the record if necessary and emit it.  Note that if slice
   // is empty, we still want to iterate once to emit a single
   // zero-length record
+  // 将slice分段并emit她，如果slice是空，仍会emit一个长度为0的record。
   Status s;
   bool begin = true;
   do {
+    // 当前块的剩余大小,block_offset_会在emit函数中成功把数据写入
+    // 文件后被修改。
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
+    // 当前block剩余空间小于kHeaderSize时，就新生产一个block，并用
+    // '\x00'填充.
     if (leftover < kHeaderSize) {
       // Switch to a new block
       if (leftover > 0) {
@@ -43,6 +48,7 @@ Status Writer::AddRecord(const Slice& slice) {
         assert(kHeaderSize == 7);
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
       }
+      //重设为0
       block_offset_ = 0;
     }
 
@@ -78,11 +84,13 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr, size_t n) {
 
   // Format the header
   char buf[kHeaderSize];
+  // 小端存储
   buf[4] = static_cast<char>(n & 0xff);
   buf[5] = static_cast<char>(n >> 8);
   buf[6] = static_cast<char>(t);
 
   // Compute the crc of the record type and the payload.
+  // 数据长度没有加进CRC里
   uint32_t crc = crc32c::Extend(type_crc_[t], ptr, n);
   crc = crc32c::Mask(crc);                 // Adjust for storage
   EncodeFixed32(buf, crc);

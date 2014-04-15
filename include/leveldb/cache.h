@@ -9,12 +9,16 @@
 // capacity.  For example, a cache where the values are variable
 // length strings, may use the length of the string as the charge for
 // the string.
+// Cache类是一个把key映射到value的借口，内部有同步机制，可以多线程并发
+// 访问，能自动去除老的entry以为新的entry提供空间。
 //
 // A builtin cache implementation with a least-recently-used eviction
 // policy is provided.  Clients may use their own implementations if
 // they want something more sophisticated (like scan-resistance, a
 // custom eviction policy, variable cache sizing, etc.)
 // sophisticated：复杂的、精致的
+// leveldb自带LRU Cache，用户可以自己定制更复杂的cache 策略，通过
+// options参数传入即可。
 
 #ifndef STORAGE_LEVELDB_INCLUDE_CACHE_H_
 #define STORAGE_LEVELDB_INCLUDE_CACHE_H_

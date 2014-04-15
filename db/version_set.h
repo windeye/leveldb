@@ -61,11 +61,13 @@ class Version {
   // Append to *iters a sequence of iterators that will
   // yield the contents of this Version when merged together.
   // REQUIRES: This version has been saved (see VersionSet::SaveTo)
+  // 追加一系列iterators到iters，用于merge时生成该版本的数据内容。
   void AddIterators(const ReadOptions&, std::vector<Iterator*>* iters);
 
   // Lookup the value for key.  If found, store it in *val and
   // return OK.  Else return a non-OK status.  Fills *stats.
   // REQUIRES: lock is not held
+  // 找key对应的value，找到了就赋值给val病返回OK。
   struct GetStats {
     FileMetaData* seek_file;
     int seek_file_level;
@@ -76,6 +78,7 @@ class Version {
   // Adds "stats" into the current state.  Returns true if a new
   // compaction may need to be triggered, false otherwise.
   // REQUIRES: lock is held
+  // 把stats添加到当前状态中，如果需要进行compat就返回true，否则返回false。
   bool UpdateStats(const GetStats& stats);
 
   // Record a sample of bytes read at the specified internal key.
@@ -86,6 +89,7 @@ class Version {
 
   // Reference count management (so Versions do not disappear out from
   // under live iterators)
+  // 引用计数管理，所以当有iterator引用某版本的数据时，该版本不会被删除。
   void Ref();
   void Unref();
 
@@ -99,12 +103,15 @@ class Version {
   // some part of [*smallest_user_key,*largest_user_key].
   // smallest_user_key==NULL represents a key smaller than all keys in the DB.
   // largest_user_key==NULL represents a key largest than all keys in the DB.
+  // 如果指定level中的文件和[*smallest_user_key,*largest_user_key]之间有重叠
+  // 部分则返回true。
   bool OverlapInLevel(int level,
                       const Slice* smallest_user_key,
                       const Slice* largest_user_key);
 
   // Return the level at which we should place a new memtable compaction
   // result that covers the range [smallest_user_key,largest_user_key].
+  // 找一个能覆盖[smallest_user_key,largest_user_key]的level进行compaction.
   int PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                  const Slice& largest_user_key);
 
@@ -147,6 +154,7 @@ class Version {
   // Level that should be compacted next and its compaction score.
   // Score < 1 means compaction is not strictly needed.  These fields
   // are initialized by Finalize().
+  // 下一个要compact的level和他的分数，小于1表示优先级不是很高，在Finalize()初始化。
   double compaction_score_;
   int compaction_level_;
 
@@ -307,7 +315,7 @@ class VersionSet {
   bool ManifestContains(const std::string& record) const;
 
   // 下面几个字段来自DBImpl构造传的值
-  Env* const env_;
+  Env* const env_;  //系统相关操作的封装,比如文件操作等
   const std::string dbname_;
   const Options* const options_;
   TableCache* const table_cache_;
@@ -320,7 +328,7 @@ class VersionSet {
   uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
   // Opened lazily
-  // menifest文件相关
+  // menifest文件和版本控制相关
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.
@@ -328,7 +336,7 @@ class VersionSet {
 
   // Per-level key at which the next compaction at that level should start.
   // Either an empty string, or a valid InternalKey.
-  // level下一次compaction的开始key，空字符串或者合法的InternalKey
+  // 每个level下一次compaction的开始key，空字符串或者合法的InternalKey
   std::string compact_pointer_[config::kNumLevels];
 
   // No copying allowed

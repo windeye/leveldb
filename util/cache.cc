@@ -33,7 +33,7 @@ struct LRUHandle {
   size_t key_length;
   uint32_t refs;  // 本cache的引用计数
   uint32_t hash;      // Hash of key(); used for fast sharding and comparisons
-  char key_data[1];   // Beginning of key，key的地址,挺巧妙啊。
+  char key_data[1];   // Beginning of key，key的地址,挺巧妙啊,只能最后一个字节。
 
   Slice key() const {
     // For cheaper lookups, we allow a temporary Handle object
@@ -101,6 +101,7 @@ class HandleTable {
   // Return a pointer to slot that points to a cache entry that
   // matches key/hash.  If there is no such cache entry, return a
   // pointer to the trailing slot in the corresponding linked list.
+  //
   LRUHandle** FindPointer(const Slice& key, uint32_t hash) {
     // 用&运算更快点，每个细节都做的这么好,定位在哪个bucket里
     LRUHandle** ptr = &list_[hash & (length_ - 1)];
@@ -184,6 +185,7 @@ LRUCache::LRUCache()
   // Make empty circular linked list
   lru_.next = &lru_;
   lru_.prev = &lru_;
+  //HandleTable 有自己的默认构造函数
 }
 
 LRUCache::~LRUCache() {
@@ -242,7 +244,7 @@ Cache::Handle* LRUCache::Insert(
   MutexLock l(&mutex_);
 
   LRUHandle* e = reinterpret_cast<LRUHandle*>(
-      malloc(sizeof(LRUHandle)-1 + key.size()));
+      malloc(sizeof(LRUHandle)-1 + key.size())); // key是用的一个字节的数组,所以这里要+key.size()-1
   e->value = value;
   e->deleter = deleter;
   e->charge = charge;

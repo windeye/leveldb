@@ -92,22 +92,25 @@ class VersionEdit {
  private:
   friend class VersionSet;
 
+  // <level, filenumber>
   typedef std::set< std::pair<int, uint64_t> > DeletedFileSet;
 
   std::string comparator_; // key comparator名字
   uint64_t log_number_; // 日志编号  
   uint64_t prev_log_number_; // 上一个日志编号
   uint64_t next_file_number_; // 下一个文件编号
-  SequenceNumber last_sequence_; // 上一个seq,是最后一个seq num吗？
+  SequenceNumber last_sequence_; // 上一个seq number
   bool has_comparator_;
   bool has_log_number_;
   bool has_prev_log_number_;
   bool has_next_file_number_;
   bool has_last_sequence_;
 
-  // 压缩点
+  // 压缩点, 是<level, key>的形式
   std::vector< std::pair<int, InternalKey> > compact_pointers_;
+  //要删除的文件集合
   DeletedFileSet deleted_files_;
+  // 新增文件集合
   std::vector< std::pair<int, FileMetaData> > new_files_;
 };
 

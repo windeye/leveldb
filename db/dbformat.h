@@ -36,6 +36,9 @@ static const int kL0_StopWritesTrigger = 12;
 // expensive manifest file operations.  We do not push all the way to
 // the largest level since that can generate a lot of wasted disk
 // space if the same key space is being repeatedly overwritten.
+// 如果没有重叠，合并memtable的最大level，我们选择level 2可以避免
+// 压缩level 0=>1的开销和操作manifest文件的开销，不push所有数据到最大level
+// 的原因：如果相同的key space被重复的覆盖重写，那样会浪费很多磁盘空间。
 static const int kMaxMemCompactLevel = 2;
 
 // Approximate gap in bytes between samples of data read during iteration.

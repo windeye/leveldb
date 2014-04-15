@@ -172,7 +172,9 @@ bool SomeFileOverlapsRange(
 // is the largest key that occurs in the file, and value() is an
 // 16-byte value containing the file number and file size, both
 // encoded using EncodeFixed64.
-// 对指定的version/level对，遍历这个level的sstable文件信息，
+// 对指定的version/level对，生成这个level的sstable文件信息，对于给定
+// 的entry，key()是文件中出现的最大key，value是包含文件号和文件大小
+// 的16 bytes值，并且都使用EncodeFixed64编码。
 class Version::LevelFileNumIterator : public Iterator {
  public:
   // InternalKeyComparator比较器，flist是sstable文件列表。
@@ -268,6 +270,7 @@ void Version::AddIterators(const ReadOptions& options,
   // For levels > 0, we can use a concatenating iterator that sequentially
   // walks through the non-overlapping files in the level, opening them
   // lazily.
+  // 对level > 0的sst，使用连接iterator顺序遍历每个level里不会重叠的文件集合。
   // 对level > 0的sst，使用lazy open，push的是two level iterator。
   for (int level = 1; level < config::kNumLevels; level++) {
     if (!files_[level].empty()) {
@@ -404,7 +407,7 @@ Status Version::Get(const ReadOptions& options,
       // level 0木有找着，找下一个level。
       if (tmp.empty()) continue;
 
-      // 找着啦，按照文件的编号排序。
+      // 找着一些可能的文件，按照文件的编号排序。
       std::sort(tmp.begin(), tmp.end(), NewestFirst);
       // files 指向第一个文件。
       files = &tmp[0];
@@ -440,7 +443,8 @@ Status Version::Get(const ReadOptions& options,
         // 文件，就在stat记录一下这个事情，其后leveldb会调用UpdateStats(stat)。
         // 进入这个流程就说明在这个key range查找key都要找不止1个文件，
         // UpdateStats(stat)会在这时将allowed_seeks--，当allowed_seeks为0时，
-        // 说明现在level 0的查找效率比较低，需要进行compaction。
+        // 说明这个文件已多次在一个文件集合中被第一个查找却没找到target，
+        // 现在level 0的查找效率比较低，需要进行compaction。
         stats->seek_file = last_file_read;
         stats->seek_file_level = last_file_read_level;
       }
@@ -628,6 +632,7 @@ void Version::GetOverlappingInputs(
         // level 0的文件可能会重合，所以检查新加的文件是否范围更大，
         // 如果是就增加搜索范围重新搜索。这里不太明白呢！？？？
         // 为了尽可能找出有重叠包含的文件？？？
+        // 这么干能把范围扩大到最大，找出有重叠的所有文件。
         if (begin != NULL && user_cmp->Compare(file_start, user_begin) < 0) {
           user_begin = file_start;
           inputs->clear();
@@ -781,14 +786,14 @@ class VersionSet::Builder {
       // conservative and allow approximately one seek for every 16KB
       // of data before triggering a compaction.
       // 经过allowed_seeks次seek后，就需要进行压缩处理，
-      // 基于上面的假设，一次seek的代价和compact 40KB数据代价相同，
+      // 基于下面的假设，一次seek的代价和compact 40KB数据代价相同，
       // 我们保守一点，每16KB的数据在触发compaction前可以seek一次，那么
       // 一个文件compaction前可以seek的次数就是文件的size/16KB。不足100次
-      // 的按最小100此计算。
+      // 的按最小100次计算。
       f->allowed_seeks = (f->file_size / 16384); // 16kB
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
 
-      // 可能再deleted中有这个文件，先delete下。
+      // 可能在deleted文件中有这个文件，先delete下。
       levels_[level].deleted_files.erase(f->number);
       levels_[level].added_files->insert(f);
     }
@@ -1030,7 +1035,7 @@ Status VersionSet::Recover() {
   };
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
-  // 读取CURRENT，获得manifest的文件名，解析manifest，
+  // 读取CURRENT，获得manifest的文件名，解析manifest
   std::string current;
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
   if (!s.ok()) {

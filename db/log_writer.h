@@ -33,6 +33,8 @@ class Writer {
   // crc32c values for all supported record types.  These are
   // pre-computed to reduce the overhead of computing the crc of the
   // record type stored in the header.
+  // 各种Record类型值在初始化writer时就计算好，保存起来，减少重复
+  // 重复计算crc的开销。
   uint32_t type_crc_[kMaxRecordType + 1];
 
   Status EmitPhysicalRecord(RecordType type, const char* ptr, size_t length);
