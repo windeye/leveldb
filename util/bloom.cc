@@ -9,11 +9,12 @@
 
 namespace leveldb {
 
+// 用了个anonymous namespace干啥?
 namespace {
 static uint32_t BloomHash(const Slice& key) {
   return Hash(key.data(), key.size(), 0xbc9f1d34);
 }
-
+// false positive rate 出错率
 class BloomFilterPolicy : public FilterPolicy {
  private:
   size_t bits_per_key_;
@@ -40,6 +41,7 @@ class BloomFilterPolicy : public FilterPolicy {
     // by enforcing a minimum bloom filter length.
     if (bits < 64) bits = 64;
 
+    // 与8对齐
     size_t bytes = (bits + 7) / 8;
     bits = bytes * 8;
 
@@ -52,7 +54,7 @@ class BloomFilterPolicy : public FilterPolicy {
       // See analysis in [Kirsch,Mitzenmacher 2006].
       uint32_t h = BloomHash(keys[i]);
       const uint32_t delta = (h >> 17) | (h << 15);  // Rotate right 17 bits
-      for (size_t j = 0; j < k_; j++) {
+      for (size_t j = 0; j < k_; j++) { // 生成k_个hash值
         const uint32_t bitpos = h % bits;
         array[bitpos/8] |= (1 << (bitpos % 8));
         h += delta;

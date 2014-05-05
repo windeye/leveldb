@@ -189,6 +189,7 @@ class DBImpl : public DB {
       this->bytes_written += c.bytes_written;
     }
   };
+  // 每个level维护一个state，会记录该level所有compaction消耗的时间，读写文件大小。
   CompactionStats stats_[config::kNumLevels];
 
   // No copying allowed

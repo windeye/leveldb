@@ -53,6 +53,7 @@ class FilterPolicy {
   // the key was in the list of keys passed to CreateFilter().
   // This method may return true or false if the key was not on the
   // list, but it should aim to return false with a high probability.
+  //
   // filter包含在CreateFilter中Append到dst的数据。如果key在CreateFilter
   // 的keys列表中，这个函数一定返回true，如果key不在keys列表中，则可能
   // 返回true或者false，我们的目标是返回false的几率很大。
@@ -62,9 +63,11 @@ class FilterPolicy {
 // Return a new filter policy that uses a bloom filter with approximately
 // the specified number of bits per key.  A good value for bits_per_key
 // is 10, which yields a filter with ~ 1% false positive rate.
+// bits_per_key设置为10比较好，可以让出错的概率只有1%。
 //
 // Callers must delete the result after any database that is using the
 // result has been closed.
+// 用完了要记住free它。
 //
 // Note: if you are using a custom comparator that ignores some parts
 // of the keys being compared, you must not use NewBloomFilterPolicy()
@@ -73,7 +76,6 @@ class FilterPolicy {
 // ignores trailing spaces, it would be incorrect to use a
 // FilterPolicy (like NewBloomFilterPolicy) that does not ignore
 // trailing spaces in keys.
-//
 extern const FilterPolicy* NewBloomFilterPolicy(int bits_per_key);
 
 }

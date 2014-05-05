@@ -21,6 +21,10 @@
 #include "db/write_batch_internal.h"
 #include "util/coding.h"
 
+// write_batch与write_batch_internal的关系式这样的，write_batch的
+// 一些API封装在write_batch_internal里，而且都是static 函数write_batch_internal
+// 成为write_batch的friend class，write_batch对象指针传给write_batch_internal的
+// 方法，由此来完成本来可以放在write_batch里完成的功能。why?
 namespace leveldb {
 
 // WriteBatch header has an 8-byte sequence number followed by a 4-byte count.
@@ -36,12 +40,14 @@ WriteBatch::Handler::~Handler() { }
 
 void WriteBatch::Clear() {
   rep_.clear();
+  // resize如果没有指定填充字符，则用null character填充多余的空间。
   rep_.resize(kHeader);
 }
 
 Status WriteBatch::Iterate(Handler* handler) const {
   Slice input(rep_);
   if (input.size() < kHeader) {
+    // malformed: 畸形的 难看的
     return Status::Corruption("malformed WriteBatch (too small)");
   }
 
@@ -104,6 +110,7 @@ void WriteBatch::Put(const Slice& key, const Slice& value) {
 
 void WriteBatch::Delete(const Slice& key) {
   WriteBatchInternal::SetCount(this, WriteBatchInternal::Count(this) + 1);
+  // void push_back (char c); 增加一个字符，直接用了char的数值。
   rep_.push_back(static_cast<char>(kTypeDeletion));
   PutLengthPrefixedSlice(&rep_, key);
 }
@@ -135,6 +142,7 @@ Status WriteBatchInternal::InsertInto(const WriteBatch* b,
 
 void WriteBatchInternal::SetContents(WriteBatch* b, const Slice& contents) {
   assert(contents.size() >= kHeader);
+  // Assigns a new value to the string, replacing its current contents.
   b->rep_.assign(contents.data(), contents.size());
 }
 

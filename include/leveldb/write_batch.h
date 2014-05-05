@@ -27,7 +27,7 @@
 namespace leveldb {
 
 class Slice;
-
+// 更新操作的集合，所以不会出现Get这样的操作。
 class WriteBatch {
  public:
   WriteBatch();
@@ -43,6 +43,7 @@ class WriteBatch {
   void Clear();
 
   // Support for iterating over the contents of a batch.
+  // batch的iterator
   class Handler {
    public:
     virtual ~Handler();

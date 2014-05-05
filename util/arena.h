@@ -26,6 +26,7 @@ class Arena {
   // Returns an estimate of the total memory usage of data allocated
   // by the arena (including space allocated but not yet used for user
   // allocations).
+  // Arena所占内存总量
   size_t MemoryUsage() const {
     return blocks_memory_ + blocks_.capacity() * sizeof(char*);
   }
@@ -53,6 +54,7 @@ inline char* Arena::Allocate(size_t bytes) {
   // The semantics of what to return are a bit messy if we allow
   // 0-byte allocations, so we disallow them here (we don't need
   // them for our internal use).
+  // 必须大于0，空间不足则调用AllocateFallback
   assert(bytes > 0);
   if (bytes <= alloc_bytes_remaining_) {
     char* result = alloc_ptr_;

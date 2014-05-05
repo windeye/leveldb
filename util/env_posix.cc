@@ -41,13 +41,15 @@ class PosixSequentialFile: public SequentialFile {
   FILE* file_;
 
  public:
+  //不负责打开文件。
   PosixSequentialFile(const std::string& fname, FILE* f)
       : filename_(fname), file_(f) { }
   virtual ~PosixSequentialFile() { fclose(file_); }
 
-  // 需要提供外部同步，线程不安全
+  // 需要提供外部同步，线程不安全?顺序读要加锁吗？
   virtual Status Read(size_t n, Slice* result, char* scratch) {
     Status s;
+    // fread
     size_t r = fread_unlocked(scratch, 1, n, file_);
     *result = Slice(scratch, r);
     if (r < n) {
@@ -112,6 +114,7 @@ class MmapLimiter {
       return false;
     }
     // 有atomic啦，为啥还要用mutex。
+    // 因为现在要get再set？
     MutexLock l(&mu_);
     intptr_t x = GetAllowed();
     if (x <= 0) {
@@ -155,6 +158,7 @@ class PosixMmapReadableFile: public RandomAccessFile {
 
  public:
   // base[0,length-1] contains the mmapped contents of the file.
+  // 不负责mmap，只负责在析构是munmap
   PosixMmapReadableFile(const std::string& fname, void* base, size_t length,
                         MmapLimiter* limiter)
       : filename_(fname), mmapped_region_(base), length_(length),
@@ -216,6 +220,7 @@ class PosixMmapFile : public WritableFile {
         // Defer syncing this data until next Sync() call, if any
         pending_sync_ = true;
       }
+      // 如果要延迟同步操作，但还没有执同步，这里调用munmap后那么何时回去同步？
       if (munmap(base_, limit_ - base_) != 0) {
         result = false;
       }
@@ -262,6 +267,7 @@ class PosixMmapFile : public WritableFile {
         last_sync_(NULL),
         file_offset_(0),
         pending_sync_(false) {
+    // 2的整数幂大小
     assert((page_size & (page_size - 1)) == 0);
   }
 
@@ -359,6 +365,7 @@ class PosixMmapFile : public WritableFile {
 
     if (pending_sync_) {
       // Some unmapped data was not synced
+      // munmap之后还可以进行数据同步，咋管理的这块内存？
       pending_sync_ = false;
       if (fdatasync(fd_) < 0) {
         s = IOError(filename_, errno);
@@ -400,7 +407,7 @@ class PosixFileLock : public FileLock {
 // Set of locked files.  We keep a separate set instead of just
 // relying on fcntrl(F_SETLK) since fcntl(F_SETLK) does not provide
 // any protection against multiple uses from the same process.
-// F_SETLK无法保护统一进程对同一文件的并发操作
+// F_SETLK无法保护同一进程对同一文件的并发操作
 class PosixLockTable {
  private:
   port::Mutex mu_;
@@ -441,6 +448,7 @@ class PosixEnv : public Env {
     *result = NULL;
     Status s;
     int fd = open(fname.c_str(), O_RDONLY);
+    //有mmap和regular file两个选择
     if (fd < 0) {
       s = IOError(fname, errno);
     } else if (mmap_limit_.Acquire()) {
@@ -656,6 +664,7 @@ PosixEnv::PosixEnv() : page_size_(getpagesize()),
   PthreadCall("cvar_init", pthread_cond_init(&bgsignal_, NULL));
 }
 
+// schedule是生产者
 void PosixEnv::Schedule(void (*function)(void*), void* arg) {
   PthreadCall("lock", pthread_mutex_lock(&mu_));
 
@@ -681,6 +690,7 @@ void PosixEnv::Schedule(void (*function)(void*), void* arg) {
   PthreadCall("unlock", pthread_mutex_unlock(&mu_));
 }
 
+// BGThread是消费者
 void PosixEnv::BGThread() {
   while (true) {
     // Wait until there is an item that is ready to run
@@ -707,6 +717,7 @@ struct StartThreadState {
 static void* StartThreadWrapper(void* arg) {
   StartThreadState* state = reinterpret_cast<StartThreadState*>(arg);
   state->user_function(state->arg);
+  //启动后就可以delete了，没这么用过，细致！！
   delete state;
   return NULL;
 }
@@ -722,11 +733,16 @@ void PosixEnv::StartThread(void (*function)(void* arg), void* arg) {
 
 }  // namespace
 
+// once在使用前必须赋值为PTHREAD_ONCE_INIT，不然会有异常行为
 static pthread_once_t once = PTHREAD_ONCE_INIT;
 static Env* default_env;
 static void InitDefaultEnv() { default_env = new PosixEnv; }
 
 Env* Env::Default() {
+  // 一次性函数的执行有三种状态，NEVER(0), IN_PROGRESS(1), DONE(2),应该是使用
+  // once的值来控制的吧。然后使用互斥锁和条件变量保证函数只运行一次。只有一个
+  // pthread_once成功执行，执行期间其他线程会在条件变量上等待，执行完后会通知
+  // 其他等待线程，其他线程发现状态为DONE就不再执行这个函数。
   pthread_once(&once, InitDefaultEnv);
   return default_env;
 }

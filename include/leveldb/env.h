@@ -3,7 +3,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 //
 // An Env is an interface used by the leveldb implementation to access
-// operating system functionality like the filesystem etc.  Callers
+// operating system functionality like the filesystem etc. Callers
 // may wish to provide a custom Env object when opening a database to
 // get fine gain control; e.g., to rate limit file system operations.
 // Env为leveldb提供了一个访问操作系统功能的接口，比如文件系统等等。调用者
@@ -11,7 +11,7 @@
 //
 // All Env implementations are safe for concurrent access from
 // multiple threads without any external synchronization.
-// Env是线程安全的。
+// Env是线程安全的,因为它只有方法，没有成员变量。
 
 #ifndef STORAGE_LEVELDB_INCLUDE_ENV_H_
 #define STORAGE_LEVELDB_INCLUDE_ENV_H_
@@ -116,7 +116,7 @@ class Env {
   // acquired lock in *lock and returns OK.  The caller should call
   // UnlockFile(*lock) to release the lock.  If the process exits,
   // the lock will be automatically released.
-  // 如果成功,保存一个lock对象指针到*lock并返回OK。调用者要调用Unlock
+  // 如果成功,保存一个lock对象指针到*lock并返回OK。调用者要调用UnlockFile
   // 释放这个锁，如果线程退出，锁会被自动释放。
   //
   // If somebody else already holds the lock, finishes immediately
@@ -168,6 +168,7 @@ class Env {
 };
 
 // A file abstraction for reading sequentially through a file
+// 非线程安全
 class SequentialFile {
  public:
   SequentialFile() { }
@@ -179,6 +180,7 @@ class SequentialFile {
   // May set "*result" to point at data in "scratch[0..n-1]", so
   // "scratch[0..n-1]" must be live when "*result" is used.
   // If an error was encountered, returns a non-OK status.
+  // 如果成功，result将指向读取到的数据。
   //
   // REQUIRES: External synchronization
   virtual Status Read(size_t n, Slice* result, char* scratch) = 0;
@@ -199,6 +201,7 @@ class SequentialFile {
 };
 
 // A file abstraction for randomly reading the contents of a file.
+// 线程安全
 class RandomAccessFile {
  public:
   RandomAccessFile() { }
@@ -246,6 +249,7 @@ class WritableFile {
 class Logger {
  public:
   Logger() { }
+  // 用于继承了，不然没什么必要！
   virtual ~Logger();
 
   // Write an entry to the log file with the specified format.

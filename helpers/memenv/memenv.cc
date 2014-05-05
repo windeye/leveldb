@@ -38,6 +38,7 @@ class FileState {
       --refs_;
       assert(refs_ >= 0);
       if (refs_ <= 0) {
+        //为啥不在这直接delete
         do_delete = true;
       }
     }

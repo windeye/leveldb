@@ -8,6 +8,7 @@
 //
 // Each Version keeps track of a set of Table files per level.  The
 // entire set of versions is maintained in a VersionSet.
+// 每个version跟踪各个level的sst文件，全部version的集合维护在VersionSet中
 //
 // Version,VersionSet are thread-compatible, but require external
 // synchronization on all accesses.
@@ -39,6 +40,9 @@ class WritableFile;
 // Return the smallest index i such that files[i]->largest >= key.
 // Return files.size() if there is no such file.
 // REQUIRES: "files" contains a sorted list of non-overlapping files.
+// 返回files中第一个largest key >= key的文件的index。如果没有这样的
+// 文件就返回files.size()，要求files中的文件无重叠部分，应该是只能
+// 传level>=1的level内的全部文件。
 extern int FindFile(const InternalKeyComparator& icmp,
                     const std::vector<FileMetaData*>& files,
                     const Slice& key);
@@ -49,9 +53,10 @@ extern int FindFile(const InternalKeyComparator& icmp,
 // largest==NULL represents a key largest than all keys in the DB.
 // REQUIRES: If disjoint_sorted_files, files[] contains disjoint ranges
 //           in sorted order.
+//  
 extern bool SomeFileOverlapsRange(
     const InternalKeyComparator& icmp,
-    bool disjoint_sorted_files,
+    bool disjoint_sorted_files,  // 是文件集合的内容无重叠
     const std::vector<FileMetaData*>& files,
     const Slice* smallest_user_key,
     const Slice* largest_user_key);
@@ -67,11 +72,12 @@ class Version {
   // Lookup the value for key.  If found, store it in *val and
   // return OK.  Else return a non-OK status.  Fills *stats.
   // REQUIRES: lock is not held
-  // 找key对应的value，找到了就赋值给val病返回OK。
+  // 找key对应的value，找到了就赋值给val返回OK。
   struct GetStats {
     FileMetaData* seek_file;
     int seek_file_level;
   };
+  // 从current中查找
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val,
              GetStats* stats);
 
@@ -110,7 +116,7 @@ class Version {
                       const Slice* largest_user_key);
 
   // Return the level at which we should place a new memtable compaction
-  // result that covers the range [smallest_user_key,largest_user_key].
+  // result that covers the range [smallest_user_key, largest_user_key].
   // 找一个能覆盖[smallest_user_key,largest_user_key]的level进行compaction.
   int PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                  const Slice& largest_user_key);
@@ -156,6 +162,7 @@ class Version {
   // are initialized by Finalize().
   // 下一个要compact的level和他的分数，小于1表示优先级不是很高，在Finalize()初始化。
   double compaction_score_;
+  // 在PickCompaction是会从这个level开始选
   int compaction_level_;
 
   explicit Version(VersionSet* vset)
@@ -244,6 +251,8 @@ class VersionSet {
   // Returns NULL if there is no compaction to be done.
   // Otherwise returns a pointer to a heap-allocated object that
   // describes the compaction.  Caller should delete the result.
+  // 为compaction选取level和输入文件列表，没必要compaction则返回NULL
+  // 返回值是heap-allocated对象，要记得delete。
   Compaction* PickCompaction();
 
   // Return a compaction object for compacting the range [begin,end] in
@@ -351,6 +360,7 @@ class Compaction {
 
   // Return the level that is being compacted.  Inputs from "level"
   // and "level+1" will be merged to produce a set of "level+1" files.
+  // 返回正在进行compaction的level，level和level+1的数据合并生成level+1的文件
   int level() const { return level_; }
 
   // Return the object that holds the edits to the descriptor done
@@ -368,6 +378,7 @@ class Compaction {
 
   // Is this a trivial compaction that can be implemented by just
   // moving a single input file to the next level (no merging or splitting)
+  // 是否这次compaction可以简单的将文件move到下一个level，不用split和merge。
   bool IsTrivialMove() const;
 
   // Add all inputs to this compaction as delete operations to *edit.
@@ -376,6 +387,7 @@ class Compaction {
   // Returns true if the information we have available guarantees that
   // the compaction is producing data in "level+1" for which no data exists
   // in levels greater than "level+1".
+  // 如果compaction生成的level+1的数据，在大于level+1的level中没有与之相同的数据。
   bool IsBaseLevelForKey(const Slice& user_key);
 
   // Returns true iff we should stop building the current output
@@ -398,10 +410,12 @@ class Compaction {
   VersionEdit edit_;
 
   // Each compaction reads inputs from "level_" and "level_+1"
+  // 两个待合并level的输入文件列表
   std::vector<FileMetaData*> inputs_[2];      // The two sets of inputs
 
   // State used to check for number of of overlapping grandparent files
   // (parent == level_ + 1, grandparent == level_ + 2)
+  // 用于计算和grandparent的重叠度的文件列表，超过一定数量就输出合并结果。
   std::vector<FileMetaData*> grandparents_;
   size_t grandparent_index_;  // Index in grandparent_starts_
   bool seen_key_;             // Some output key has been seen

@@ -13,8 +13,11 @@ class MemTable;
 
 // WriteBatchInternal provides static methods for manipulating a
 // WriteBatch that we don't want in the public WriteBatch interface.
+// 都是静态方法，在WriteBatch直接使用类名来调用,friend class of write_batch
+
 class WriteBatchInternal {
  public:
+  // 主要都是对string里的各个数据field的操作
   // Return the number of entries in the batch.
   static int Count(const WriteBatch* batch);
 

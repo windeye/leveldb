@@ -26,6 +26,7 @@ void AppendEscapedStringTo(std::string* str, const Slice& value) {
       str->push_back(c);
     } else {
       char buf[10];
+      // 比如c的值是12，则buf里是 \x0c
       snprintf(buf, sizeof(buf), "\\x%02x",
                static_cast<unsigned int>(c) & 0xff);
       str->append(buf);
