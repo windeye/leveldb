@@ -40,13 +40,14 @@ class Comparator {
 
   // Advanced functions: these are used to reduce the space requirements
   // for internal data structures like index blocks.
-  // 高级函数，用于减少内部数据结构的空间需求，比如index blocks。
+  // 两个高级函数，用于减少像index block等内部数据结构的空间需求,比如
+  // 生成index是减小key的长度以表示一个更大的范围等。
 
   // If *start < limit, changes *start to a short string in [start,limit).
   // Simple comparator implementations may return with *start unchanged,
   // i.e., an implementation of this method that does nothing is correct.
-  // 如果 *start < limit， 把*start变为[start,limit)内的一个短字符串。
-  // 简单的comparator可以不改变*start。
+  // 如果 *start < limit， 就在[start,limit)内找一个短字符串赋值给start。
+  // 简单的comparator可以不改变*start。separator:分离器
   virtual void FindShortestSeparator(
       std::string* start,
       const Slice& limit) const = 0;
@@ -54,13 +55,14 @@ class Comparator {
   // Changes *key to a short string >= *key.
   // Simple comparator implementations may return with *key unchanged,
   // i.e., an implementation of this method that does nothing is correct.
-  // 把*key变为一个 >=*key的短字符串。
+  // 把*key变为一个 >=*key的短字符串。 successor：继承者
   virtual void FindShortSuccessor(std::string* key) const = 0;
 };
 
 // Return a builtin comparator that uses lexicographic byte-wise
 // ordering.  The result remains the property of this module and
 // must not be deleted.
+// lexicographic:字典的，字典序的
 extern const Comparator* BytewiseComparator();
 
 }  // namespace leveldb

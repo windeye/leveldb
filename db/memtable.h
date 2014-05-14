@@ -21,12 +21,15 @@ class MemTable {
  public:
   // MemTables are reference counted.  The initial reference count
   // is zero and the caller must call Ref() at least once.
+  // 引用计数的，初始值是0，调用者必须调用Ref至少1次。
   explicit MemTable(const InternalKeyComparator& comparator);
 
   // Increase reference count.
   void Ref() { ++refs_; }
 
   // Drop reference count.  Delete if no more references exist.
+  // ~MemTable是private函数，因此只有Unref中能释放本对象。
+  // 使用reference count也能防止在对象被使用的情况下在其他地方被释放
   void Unref() {
     --refs_;
     assert(refs_ >= 0);
@@ -37,6 +40,7 @@ class MemTable {
 
   // Returns an estimate of the number of bytes of data in use by this
   // data structure.
+  // 估计一下table中的数据占用的空间。大概就是Arena中使用了的内存数。
   //
   // REQUIRES: external synchronization to prevent simultaneous
   // operations on the same MemTable.
@@ -76,10 +80,11 @@ class MemTable {
 
   typedef SkipList<const char*, KeyComparator> Table;
 
+  // 只是封装了一下InternalKeyComparator。
   KeyComparator comparator_;
   int refs_;
   Arena arena_;
-  Table table_;
+  Table table_;  // skiplist
 
   // No copying allowed
   MemTable(const MemTable&);

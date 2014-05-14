@@ -18,6 +18,7 @@ namespace leveldb {
 
 // Grouping of constants.  We may want to make some of these
 // parameters set via options.
+// 一些参数希望可以通过option来设置
 namespace config {
 static const int kNumLevels = 7;
 
@@ -37,12 +38,14 @@ static const int kL0_StopWritesTrigger = 12;
 // the largest level since that can generate a lot of wasted disk
 // space if the same key space is being repeatedly overwritten.
 // 如果没有重叠，合并memtable的最大level，我们选择level 2可以避免
-// 压缩level 0=>1的开销和操作manifest文件的开销，不push所有数据到最大level
-// 的原因：如果相同的key space被重复的覆盖重写，那样会浪费很多磁盘空间。
+// 压缩level 0=>1的开销(避免过多compaction)和操作manifest文件的开销，
+// 不push所有数据到最大level的原因：如果相同的key space被重复的覆盖重写，
+// 那样会浪费很多磁盘空间。
+// 在PickLevelForMemtableOutput里有用到这个值
 static const int kMaxMemCompactLevel = 2;
 
 // Approximate gap in bytes between samples of data read during iteration.
-static const int kReadBytesPeriod = 1048576;
+static const int kReadBytesPeriod = 1048576;  // 1MB
 
 }  // namespace config
 
@@ -51,6 +54,7 @@ class InternalKey;
 // Value types encoded as the last component of internal keys.
 // DO NOT CHANGE THESE ENUM VALUES: they are embedded in the on-disk
 // data structures.
+// 这两个值会被static_cast<char>转为字符然后编码到文件中
 enum ValueType {
   kTypeDeletion = 0x0,
   kTypeValue = 0x1
@@ -65,11 +69,13 @@ static const ValueType kValueTypeForSeek = kTypeValue;
 
 typedef uint64_t SequenceNumber;
 
+// 给ValueType预留8bits，和sequence number组成64bits.
 // We leave eight bits empty at the bottom so a type and sequence#
 // can be packed together into 64-bits.
 static const SequenceNumber kMaxSequenceNumber =
     ((0x1ull << 56) - 1);
 
+// 对InternalKey拆分后的结果
 struct ParsedInternalKey {
   Slice user_key;
   SequenceNumber sequence;
@@ -85,7 +91,7 @@ struct ParsedInternalKey {
 inline size_t InternalKeyEncodingLength(const ParsedInternalKey& key) {
   return key.user_key.size() + 8;
 }
-
+// InternalKey结构：user key (string) | sequence number (7 bytes) | value type (1 byte)
 // Append the serialization of "key" to *result.
 extern void AppendInternalKey(std::string* result,
                               const ParsedInternalKey& key);
@@ -94,6 +100,7 @@ extern void AppendInternalKey(std::string* result,
 // stores the parsed data in "*result", and returns true.
 //
 // On error, returns false, leaves "*result" in an undefined state.
+// 尝试把internal_key分解生成ParsedInternalKey。
 extern bool ParseInternalKey(const Slice& internal_key,
                              ParsedInternalKey* result);
 
@@ -108,6 +115,7 @@ inline ValueType ExtractValueType(const Slice& internal_key) {
   const size_t n = internal_key.size();
   uint64_t num = DecodeFixed64(internal_key.data() + n - 8);
   unsigned char c = num & 0xff;
+  // 可以把数值用static_cast强转为enumerator,不然编译报错。
   return static_cast<ValueType>(c);
 }
 
@@ -155,7 +163,9 @@ class InternalKey {
     AppendInternalKey(&rep_, ParsedInternalKey(user_key, s, t));
   }
 
+  // 就是从slice转为string
   void DecodeFrom(const Slice& s) { rep_.assign(s.data(), s.size()); }
+  // 把internalkey转为slice
   Slice Encode() const {
     assert(!rep_.empty());
     return rep_;
@@ -191,6 +201,7 @@ inline bool ParseInternalKey(const Slice& internal_key,
 }
 
 // A helper class useful for DBImpl::Get()
+// 对DBImpl::Get()的辅助类
 class LookupKey {
  public:
   // Initialize *this for looking up user_key at a snapshot with
@@ -199,6 +210,7 @@ class LookupKey {
 
   ~LookupKey();
 
+  // 可以返回三种类型的key
   // Return a key suitable for lookup in a MemTable.
   Slice memtable_key() const { return Slice(start_, end_ - start_); }
 
@@ -209,6 +221,9 @@ class LookupKey {
   Slice user_key() const { return Slice(kstart_, end_ - kstart_ - 8); }
 
  private:
+  // LookupKey构造：klength|userkey|sequence(7)|valuetype(1)
+  // valuetyep的值是kValueTypeForSeek
+  // klengthkey的长度+8,所以这是不是应该改成char[klength-8]
   // We construct a char array of the form:
   //    klength  varint32               <-- start_
   //    userkey  char[klength]          <-- kstart_
@@ -219,6 +234,7 @@ class LookupKey {
   const char* start_;
   const char* kstart_;
   const char* end_;
+  // 对短的key可以直接使用这块内存，避免内存分配
   char space_[200];      // Avoid allocation for short keys
 
   // No copying allowed
@@ -227,6 +243,7 @@ class LookupKey {
 };
 
 inline LookupKey::~LookupKey() {
+  // 分配了新内存，要释放掉，start_ = new char[size]
   if (start_ != space_) delete[] start_;
 }
 

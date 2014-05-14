@@ -81,6 +81,7 @@ bool ParseFileName(const std::string& fname,
                    uint64_t* number,
                    FileType* type) {
   Slice rest(fname);
+  // 先比较没有后缀的文件名，直接识别文件类型
   if (rest == "CURRENT") {
     *number = 0;
     *type = kCurrentFile;
@@ -105,9 +106,11 @@ bool ParseFileName(const std::string& fname,
     // Avoid strtoull() to keep filename format independent of the
     // current locale
     uint64_t num;
+    // 跳过数字
     if (!ConsumeDecimalNumber(&rest, &num)) {
       return false;
     }
+    // 通过后缀识别文件类型
     Slice suffix = rest;
     if (suffix == Slice(".log")) {
       *type = kLogFile;
@@ -130,6 +133,7 @@ Status SetCurrentFile(Env* env, const std::string& dbname,
   Slice contents = manifest;
   assert(contents.starts_with(dbname + "/"));
   contents.remove_prefix(dbname.size() + 1);
+  // 先把manifest file name写到临时文件，再重命名为CURRENT
   std::string tmp = TempFileName(dbname, descriptor_number);
   Status s = WriteStringToFileSync(env, contents.ToString() + "\n", tmp);
   if (s.ok()) {

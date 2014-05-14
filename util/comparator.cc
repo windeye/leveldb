@@ -30,7 +30,7 @@ class BytewiseComparatorImpl : public Comparator {
       std::string* start,
       const Slice& limit) const {
     // Find length of common prefix
-    // 计算公共前缀的长度
+    // 在这俩家伙的最短长度内，计算它们的公共前缀长度。 
     size_t min_length = std::min(start->size(), limit.size());
     size_t diff_index = 0;
     while ((diff_index < min_length) &&
@@ -43,10 +43,12 @@ class BytewiseComparatorImpl : public Comparator {
     } else {
       uint8_t diff_byte = static_cast<uint8_t>((*start)[diff_index]);
       // 只有*start < limit时才有用
+      // 算法比较简单：去除公共部分，如果start[diff_index]+1后仍小于limit[diff_index]
+      // 就将start[diff_index]的值加1，然后删除diff_index后的字符。
       if (diff_byte < static_cast<uint8_t>(0xff) &&
           diff_byte + 1 < static_cast<uint8_t>(limit[diff_index])) {
         (*start)[diff_index]++;
-        start->resize(diff_index + 1);
+        start->resize(diff_index + 1); // diff_index是从0计数的
         assert(Compare(*start, limit) < 0);
       }
     }
@@ -54,7 +56,7 @@ class BytewiseComparatorImpl : public Comparator {
 
   virtual void FindShortSuccessor(std::string* key) const {
     // Find first character that can be incremented
-    // 找到第一个可以++的字符，执行++后，截断字符串；  
+    // 找到第一个可以++的字符(只要不是0xff)，执行++后，截断字符串；  
     // 如果找不到说明*key的字符都是0xff，那就不作修改，直接返回 
     size_t n = key->size();
     for (size_t i = 0; i < n; i++) {

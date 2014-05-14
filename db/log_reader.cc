@@ -32,8 +32,11 @@ Reader::~Reader() {
   delete[] backing_store_;
 }
 
+// 这个函数只skip kBlockSize倍数的偏移，不会偏移到
+// 某一个block的中间部分，只会是起始部分。
 bool Reader::SkipToInitialBlock() {
   size_t offset_in_block = initial_offset_ % kBlockSize;
+  // block_start_location的大小是kBlockSize的倍数
   uint64_t block_start_location = initial_offset_ - offset_in_block;
 
   // Don't search a block if we'd be in the trailer
@@ -55,6 +58,7 @@ bool Reader::SkipToInitialBlock() {
 
   return true;
 }
+
 // 读取一条逻辑record，如果record的长度大于kBlockSize，则将结果保存
 // 在stratch，否则保存在buffer_以节省内存,但调用的时候要注意
 // scratch可能为空。
@@ -70,9 +74,11 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
   bool in_fragmented_record = false;
   // Record offset of the logical record that we're reading
   // 0 is a dummy value to make compilers happy
+  // prospective：预期的 未来的
   uint64_t prospective_record_offset = 0;
 
   Slice fragment;
+  // 阻塞读，直到读到KLastType或者KFullType类型的Record
   while (true) {
     uint64_t physical_record_offset = end_of_buffer_offset_ - buffer_.size();
     const unsigned int record_type = ReadPhysicalRecord(&fragment);

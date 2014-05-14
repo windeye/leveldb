@@ -50,6 +50,8 @@ class Reader {
   // "*scratch" as temporary storage.  The contents filled in *record
   // will only be valid until the next mutating operation on this
   // reader or the next mutation to *scratch.
+  // 读取下一个record并放在record参数中，成功则返回true，如果读到eof
+  // 则返回false。可能使用scratch做临时存储。
   bool ReadRecord(Slice* record, std::string* scratch);
 
   // Returns the physical offset of the last record returned by ReadRecord.
@@ -61,17 +63,22 @@ class Reader {
   SequentialFile* const file_;
   Reporter* const reporter_;
   bool const checksum_;
+  // 大小为blocksize的存储空间,存储一个block
   char* const backing_store_;
+  // 读取到的Record的buffer,存储record
   Slice buffer_;
+  // 如果上次Read()的返回长度< kBlockSize，表明到了文件结尾EOF.
   bool eof_;   // Last Read() indicated EOF by returning < kBlockSize
 
   // Offset of the last record returned by ReadRecord.
-  // 上一条逻辑记录在文件中的偏移
+  // ReadRecord返回后，文件中的偏移
   uint64_t last_record_offset_;
   // Offset of the first location past the end of buffer_.
+  // 当前读取buffer_的偏移
   uint64_t end_of_buffer_offset_;
 
   // Offset at which to start looking for the first record to return
+  // 第一个record的offset
   uint64_t const initial_offset_;
 
   // Extend record types with the following special values
@@ -82,6 +89,8 @@ class Reader {
     // * The record has an invalid CRC (ReadPhysicalRecord reports a drop)
     // * The record is a 0-length record (No drop is reported)
     // * The record is below constructor's initial_offset (No drop is reported)
+    // 如果读到一个无效的Record就返回kBadRecord，目前有3种：
+    // CRC错误、Record长度为0以及Record的偏移在initial_offset之前
     kBadRecord = kMaxRecordType + 2
   };
 
@@ -91,6 +100,7 @@ class Reader {
   bool SkipToInitialBlock();
 
   // Return type, or one of the preceding special values
+  // 从文件中读取一个完整的record
   unsigned int ReadPhysicalRecord(Slice* result);
 
   // Reports dropped bytes to the reporter.

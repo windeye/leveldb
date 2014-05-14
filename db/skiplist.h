@@ -52,6 +52,8 @@ class SkipList {
   // Returns true iff an entry that compares equal to key is in the list.
   bool Contains(const Key& key) const;
 
+  // 成员类，public的可以在类外用Outer::Inner来声明对象，private的则不可以。
+  // 可以在类外部用Outer::Inner::Func()来定义它的方法。
   // Iteration over the contents of a skip list
   class Iterator {
    public:
@@ -117,6 +119,7 @@ class SkipList {
   bool Equal(const Key& a, const Key& b) const { return (compare_(a, b) == 0); }
 
   // Return true if key is greater than the data stored in "n"
+  // 检查key是否大于n的key。
   bool KeyIsAfterNode(const Key& key, Node* n) const;
 
   // Return the earliest node that comes at or after key.
@@ -124,10 +127,12 @@ class SkipList {
   //
   // If prev is non-NULL, fills prev[level] with pointer to previous
   // node at "level" for every level in [0..max_height_-1].
+  // 找到第一个大于或等于key的node，没有则返回null
   Node* FindGreaterOrEqual(const Key& key, Node** prev) const;
 
   // Return the latest node with a key < key.
   // Return head_ if there is no such node.
+  // 找小于给定key的key最大的node
   Node* FindLessThan(const Key& key) const;
 
   // Return the last node in the list.
@@ -201,6 +206,7 @@ inline const Key& SkipList<Key,Comparator>::Iterator::key() const {
   return node_->key;
 }
 
+// Next的速度比Prev快很多，不用从头search,所以反向遍历代价很大
 template<typename Key, class Comparator>
 inline void SkipList<Key,Comparator>::Iterator::Next() {
   assert(Valid());
@@ -259,16 +265,19 @@ template<typename Key, class Comparator>
 typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindGreaterOrEqual(const Key& key, Node** prev)
     const {
   Node* x = head_;
+  // 从当前最大高度出发，从head开始遍历
   int level = GetMaxHeight() - 1;
   while (true) {
     Node* next = x->Next(level);
     if (KeyIsAfterNode(key, next)) {
       // Keep searching in this list
+      // 如果next在key之后，就继续在这个level上查找
       x = next;
     } else {
+      // 用prev记录各level的节点轨迹
       if (prev != NULL) prev[level] = x;
       if (level == 0) {
-        return next;
+        return next;  // 这返回的不一定是相等的key
       } else {
         // Switch to next list
         level--;
@@ -306,6 +315,7 @@ typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindLast()
   while (true) {
     Node* next = x->Next(level);
     if (next == NULL) {
+      // 只有level是0的那个节点才是最后一个
       if (level == 0) {
         return x;
       } else {
@@ -335,15 +345,18 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
   // here since Insert() is externally synchronized.
   Node* prev[kMaxHeight];
+  // 找不到会返回NULL,返回值x是x->key大于等于key的节点，
+  // prev中保存的是prev[level]->key小于key的那些节点path。
   Node* x = FindGreaterOrEqual(key, prev);
 
   // Our data structure does not allow duplicate insertion
+  // 不能有相同的key
   assert(x == NULL || !Equal(key, x->key));
 
   int height = RandomHeight();
   if (height > GetMaxHeight()) {
     for (int i = GetMaxHeight(); i < height; i++) {
-      prev[i] = head_;
+      prev[i] = head_; // 把比当前高度高的level都设为head
     }
     //fprintf(stderr, "Change height from %d to %d\n", max_height_, height);
 

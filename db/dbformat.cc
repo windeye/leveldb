@@ -53,12 +53,12 @@ int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   //    decreasing sequence number
   //    decreasing type (though sequence# should be enough to disambiguate)
 
-  //  比较user key
+  //  比较user key,字符串比较
   int r = user_comparator_->Compare(ExtractUserKey(akey), ExtractUserKey(bkey));
   if (r == 0) {
     const uint64_t anum = DecodeFixed64(akey.data() + akey.size() - 8);
     const uint64_t bnum = DecodeFixed64(bkey.data() + bkey.size() - 8);
-    // sequence number降序比较，越大的越晚
+    // sequence number降序比较，越大的排在前面
     if (anum > bnum) {
       r = -1;
     } else if (anum < bnum) {
@@ -72,9 +72,11 @@ void InternalKeyComparator::FindShortestSeparator(
       std::string* start,
       const Slice& limit) const {
   // Attempt to shorten the user portion of the key
-  Slice user_start = ExtractUserKey(*start);
+  // 试着缩短key的user key那一部分,portion:部分
+  Slice user_start = ExtractUserKey(*start); 
   Slice user_limit = ExtractUserKey(limit);
   std::string tmp(user_start.data(), user_start.size());
+  // 调用BytewiseComparatorImpl的FindShortestSeparator。
   user_comparator_->FindShortestSeparator(&tmp, user_limit);
   if (tmp.size() < user_start.size() &&
       user_comparator_->Compare(user_start, tmp) < 0) {
@@ -86,6 +88,7 @@ void InternalKeyComparator::FindShortestSeparator(
     PutFixed64(&tmp, PackSequenceAndType(kMaxSequenceNumber,kValueTypeForSeek));
     assert(this->Compare(*start, tmp) < 0);
     assert(this->Compare(tmp, limit) < 0);
+    // 使用swap，减少赋值
     start->swap(tmp);
   }
 }
@@ -98,6 +101,7 @@ void InternalKeyComparator::FindShortSuccessor(std::string* key) const {
       user_comparator_->Compare(user_key, tmp) < 0) {
     // User key has become shorter physically, but larger logically.
     // Tack on the earliest possible number to the shortened user key.
+    // 还是先搞定user key，然后使用最大kMaxSequenceNumber。
     PutFixed64(&tmp, PackSequenceAndType(kMaxSequenceNumber,kValueTypeForSeek));
     assert(this->Compare(*key, tmp) < 0);
     key->swap(tmp);
@@ -128,6 +132,7 @@ LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   size_t usize = user_key.size();
   size_t needed = usize + 13;  // A conservative estimate
   char* dst;
+  // 是否需要分配空间
   if (needed <= sizeof(space_)) {
     dst = space_;
   } else {

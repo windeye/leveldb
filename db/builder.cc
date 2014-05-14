@@ -24,6 +24,7 @@ Status BuildTable(const std::string& dbname,
   meta->file_size = 0;
   iter->SeekToFirst();
 
+  // 格式：dbname+number+.ldb
   std::string fname = TableFileName(dbname, meta->number);
   if (iter->Valid()) {
     WritableFile* file;
@@ -33,6 +34,7 @@ Status BuildTable(const std::string& dbname,
     }
 
     TableBuilder* builder = new TableBuilder(options, file);
+    // 使用iter遍历全部对象，并在meta中记录最大最小key
     meta->smallest.DecodeFrom(iter->key());
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();
@@ -42,6 +44,7 @@ Status BuildTable(const std::string& dbname,
 
     // Finish and check for builder errors
     if (s.ok()) {
+      // 生成index和footer
       s = builder->Finish();
       if (s.ok()) {
         meta->file_size = builder->FileSize();
@@ -62,6 +65,7 @@ Status BuildTable(const std::string& dbname,
     delete file;
     file = NULL;
 
+    // 将这个sstable文件加入table cache中
     if (s.ok()) {
       // Verify that the table is usable
       Iterator* it = table_cache->NewIterator(ReadOptions(),
