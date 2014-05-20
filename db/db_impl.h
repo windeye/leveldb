@@ -168,10 +168,12 @@ class DBImpl : public DB {
   };
   ManualCompaction* manual_compaction_;
 
+  // 维护一个version_set
   VersionSet* versions_;
 
   // Have we encountered a background error in paranoid mode?
   Status bg_error_;
+  // consecutive 连续不断的
   int consecutive_compaction_errors_;
 
   // Per level compaction stats.  stats_[level] stores the stats for

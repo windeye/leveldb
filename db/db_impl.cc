@@ -65,9 +65,11 @@ struct DBImpl::CompactionState {
     uint64_t file_size;
     InternalKey smallest, largest;
   };
+  // compaction中生成的文件
   std::vector<Output> outputs;
 
   // State kept for output being generated
+  // 当前输出文件以及它的TableBuilder
   WritableFile* outfile;
   TableBuilder* builder;
 
@@ -97,7 +99,7 @@ Options SanitizeOptions(const std::string& dbname,
   Options result = src;
   result.comparator = icmp;
   result.filter_policy = (src.filter_policy != NULL) ? ipolicy : NULL;
-  // table cache 大小，缓存的sst文件索引的数量
+  // table cache 大小，缓存的sst文件索引的数量[74,50000]
   ClipToRange(&result.max_open_files,    64 + kNumNonTableCacheFiles, 50000);
   // write buffer 最小64KB，最大1G, memtable的大小
   ClipToRange(&result.write_buffer_size, 64<<10,                      1<<30);
@@ -115,7 +117,7 @@ Options SanitizeOptions(const std::string& dbname,
     }
   }
   if (result.block_cache == NULL) {
-    // 也一定会有一个LRU cache, 8M.
+    // 也一定会有一个LRU cache, 8MB.
     result.block_cache = NewLRUCache(8 << 20);
   }
   return result;
